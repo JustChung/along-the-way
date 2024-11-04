@@ -5,7 +5,7 @@ import { Location, RoutePreferences } from '../types';
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 export const api = {
-  async getRestaurants(origin: Location) {
+  async getRestaurants(routeData: google.maps.DirectionsResult, origin: Location) {
     const response = await axios.get(`https://maps.googleapis.com/maps/api/place/nearbysearch/json`, {
       params: {
         location: `${origin.lat},${origin.lng}`,

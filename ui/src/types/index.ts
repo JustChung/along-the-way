@@ -8,9 +8,13 @@ export interface Location {
 export interface RoutePreferences {
     maxDetourTime: number;
     numberOfStops: number;
-    cuisineTypes: string[];
-    establishmentType: string[];
+    cuisineTypes?: string[]; // Change to optional array
+    establishmentType?: string[]; // Change to optional array
+    minRating?: number; // Optional field
+    priceLevel?: number[]; // Optional field
+    searchRadius?: number; // Optional field
 }
+
   
 export interface Restaurant {
     id: string;

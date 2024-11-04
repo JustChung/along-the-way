@@ -1,4 +1,4 @@
-// src/components/ChatBot/ChatBot.tsx
+// src/components/Map/Map.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import { Location } from '../../types';

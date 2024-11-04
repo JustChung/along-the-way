@@ -15,20 +15,50 @@ interface RouteFormData {
 }
 
 const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
-  const { register, handleSubmit } = useForm<RouteFormData>();
+  const { register, handleSubmit } = useForm<RouteFormData>({
+    defaultValues: {
+      preferences: {
+        maxDetourTime: preferences?.maxDetourTime || 0,
+        numberOfStops: preferences?.numberOfStops || 0,
+        cuisineTypes: preferences?.cuisineTypes.join(', ') || '',
+        establishmentType: preferences?.establishmentType.join(', ') || '',
+      }
+    }
+  });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form
+      onSubmit={handleSubmit((data) => {
+        // Ensure preferences are structured correctly
+        const structuredData: RouteFormData = {
+          origin: data.origin,
+          destination: data.destination,
+          preferences: {
+            maxDetourTime: data.preferences.maxDetourTime || preferences?.maxDetourTime,
+            numberOfStops: data.preferences.numberOfStops || preferences?.numberOfStops,
+            cuisineTypes: data.preferences.cuisineTypes
+              ? data.preferences.cuisineTypes.split(',').map((c) => c.trim())
+              : preferences?.cuisineTypes,
+            establishmentType: data.preferences.establishmentType
+              ? data.preferences.establishmentType.split(',').map((e) => e.trim())
+              : preferences?.establishmentType,
+          },
+        };
+
+        onSubmit(structuredData); // Call the onSubmit prop with the structured data
+      })}
+      className="space-y-4"
+    >
       <div>
         <input
-          {...register('origin')}
+          {...register('origin', { required: true })} // Added validation
           placeholder="Starting point"
           className="w-full p-2 border rounded"
         />
       </div>
       <div>
         <input
-          {...register('destination')}
+          {...register('destination', { required: true })} // Added validation
           placeholder="Destination"
           className="w-full p-2 border rounded"
         />
@@ -41,7 +71,7 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
               Max Detour Time (minutes):
               <input
                 type="number"
-                {...register('preferences.maxDetourTime')}
+                {...register('preferences.maxDetourTime', { valueAsNumber: true })} // Ensure value is treated as a number
                 defaultValue={preferences.maxDetourTime} // Example default value
               />
             </label>
@@ -51,7 +81,7 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
               Number of Stops:
               <input
                 type="number"
-                {...register('preferences.numberOfStops')}
+                {...register('preferences.numberOfStops', { valueAsNumber: true })} // Ensure value is treated as a number
                 defaultValue={preferences.numberOfStops} // Example default value
               />
             </label>
@@ -78,6 +108,7 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
           </div>
         </>
       )}
+      <button type="submit" className="mt-4 p-2 bg-blue-600 text-white rounded">Submit</button>
     </form>
   );
 };
