@@ -11,6 +11,8 @@ interface RouteFormProps {
 interface RouteFormData {
   origin: string;
   destination: string;
+  stops: string;
+  search: string;
   preferences: RoutePreferences; // Ensure preferences are included in the form data
 }
 
@@ -49,6 +51,28 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
       })}
       className="space-y-4"
     >
+      {/* Search Bar: optional input */}
+      <div className="relative">
+        <input
+          {...register('search', { required: false })}
+          placeholder="Search"
+          className="w-full p-2 pl-10 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M12.9 14.32a8 8 0 111.414-1.414l4.242 4.242a1 1 0 01-1.414 1.414l-4.242-4.242zm-1.4-6.32a5 5 0 11-10 0 5 5 0 0110 0z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </div>
+      
+      {/* Other inputs: required */}
       <div>
         <input
           {...register('origin', { required: true })} // Added validation
@@ -60,6 +84,13 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
         <input
           {...register('destination', { required: true })} // Added validation
           placeholder="Destination"
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      <div>
+        <input
+          {...register('stops', { required: true })} // Added validation
+          placeholder="Number of stops along the way"
           className="w-full p-2 border rounded"
         />
       </div>
