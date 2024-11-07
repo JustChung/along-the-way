@@ -26,7 +26,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
 
   const mapContainerStyle = {
     width: '100%',
-    height: '600px',
+    height: '100%',
   };
 
   const onLoad = useCallback((map: google.maps.Map) => {
@@ -84,7 +84,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         zoomControl: true,
         mapTypeControl: false,
         streetViewControl: false,
-        fullscreenControl: true,
+        fullscreenControl: false,
       }}
     >
       {origin && (

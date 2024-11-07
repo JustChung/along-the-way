@@ -9,6 +9,12 @@ import Map from './components/Map/Map';
 import RestaurantList from './components/RestaurantList/RestaurantList';
 import ChatBot from './components/ChatBot/ChatBot';
 import { Alert, AlertDescription } from './components/Alert';
+import { render } from "react-dom";
+import SlidingPane from "react-sliding-pane";
+import "react-sliding-pane/dist/react-sliding-pane.css";
+import {
+  ChevronDoubleRightIcon,
+} from "@heroicons/react/24/solid";
 
 const App: React.FC = () => {
   const { isLoaded, loadError } = useGoogleMaps();
@@ -23,6 +29,9 @@ const App: React.FC = () => {
     lng: -118.2437,
     address: 'Los Angeles, CA'
   });
+
+  // Sidebar open state
+  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
 
   const handleRouteSubmit = async (data: RouteFormData) => {
     const { origin, destination, preferences } = data;
@@ -119,45 +128,52 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Restaurant Route Planner</h1>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-6">
-            <RouteForm onSubmit={handleRouteSubmit} />
-            {isLoading && (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600">Searching for restaurants...</p>
-              </div>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <RestaurantList 
-              restaurants={restaurants} 
-              onSelect={handleRestaurantSelect}
-            />
-            <ChatBot />
-          </div>
-
-          <div className="lg:col-span-2">
-            <Map
-              center={mapCenter}
-              zoom={12}
-              restaurants={restaurants}
-              origin={origin}
-              destination={destination}
-              onRestaurantSelect={handleRestaurantSelect}
-            />
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 static">
+      <div className="h-screen w-screen">
+          <Map
+            center={mapCenter}
+            zoom={12}
+            restaurants={restaurants}
+            origin={origin}
+            destination={destination}
+            onRestaurantSelect={handleRestaurantSelect}
+          />
       </div>
+      <button className="z-1 w-40 h-40 m-8 absolute top-0 bg-white" onClick={() => setIsPanelOpen(true)}>
+        <div>Source Name</div>
+        <div>Destination Name</div>
+        <div>Click me
+          {/* <ChevronDoubleRightIcon className="h-5 w-5" /> */}
+        </div>
+      </button>
+      {/* Documentation: https://www.npmjs.com/package/react-sliding-pane */}
+      <SlidingPane
+        isOpen={isPanelOpen}
+        title={<h1 className="text-2xl font-bold text-gray-900">Route Planner</h1>}
+        from="left"
+        width="30%"
+        onRequestClose={() => setIsPanelOpen(false)}
+      >
+        <div className="lg:col-span-1 space-y-6">
+          <RouteForm onSubmit={handleRouteSubmit} />
+          {isLoading && (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Searching for restaurants...</p>
+            </div>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <RestaurantList 
+            restaurants={restaurants} 
+            onSelect={handleRestaurantSelect}
+          />
+          <ChatBot />
+        </div>
+      </SlidingPane>
     </div>
   );
 };
