@@ -126,6 +126,9 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 static">
+      <div className="absolute w-full">
+        <StickyNavbar/>
+      </div>
       <div className="h-screen w-screen">
           <Map
             center={mapCenter}
@@ -136,7 +139,7 @@ const App: React.FC = () => {
             onRestaurantSelect={handleRestaurantSelect}
           />
       </div>
-      <button className="z-1 w-40 h-40 m-8 absolute top-0 bg-white" onClick={() => setIsPanelOpen(true)}>
+      <button className="z-1 w-40 h-40 mt-20 ml-2 absolute top-0 bg-white" onClick={() => setIsPanelOpen(true)}>
         <div>Source Name</div>
         <div>Destination Name</div>
         <div>Resturants list</div>
@@ -147,6 +150,7 @@ const App: React.FC = () => {
       {/* Documentation: https://www.npmjs.com/package/react-sliding-pane */}
       <SlidingPane
         isOpen={isPanelOpen}
+        overlayClassName="z-[2]"
         title={<h1 className="text-2xl font-bold text-gray-900">Route Planner</h1>}
         from="left"
         width="30%"
@@ -172,7 +176,6 @@ const App: React.FC = () => {
           <ChatBot />
         </div>
       </SlidingPane>
-      <StickyNavbar/>
     </div>
   );
 };
