@@ -54,13 +54,16 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
               ? data.preferences.establishmentType.split(',').map((e) => e.trim())
               : preferences?.establishmentType,
           },
-          rating, // Add the rating to the structured data
         };
 
         onSubmit(structuredData); // Call the onSubmit prop with the structured data
       })}
       className="space-y-4"
     >
+      <div>
+        <p>* Required fields</p>
+      </div>
+
       {/* Search Bar: optional input */}
       <div className="relative">
         <input
@@ -86,28 +89,28 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
       <div>
         <input
           {...register('origin', { required: true })} // Added validation
-          placeholder="Starting point"
+          placeholder="Starting point*"
           className="w-full p-2 border rounded"
         />
       </div>
       <div>
         <input
           {...register('destination', { required: true })} // Added validation
-          placeholder="Destination"
+          placeholder="Destination*"
           className="w-full p-2 border rounded"
         />
       </div>
       <div>
         <input
           {...register('stops', { required: true })} // Added validation
-          placeholder="Number of stops along the way"
+          placeholder="Number of stops along the way*"
           className="w-full p-2 border rounded"
         />
       </div>
 
       {/* Star Rating Input */}
       <div>
-        <label className="block mb-2">Rating:</label>
+        <label className="block mb-2">Filter by Rating:</label>
         <StarRating rating={rating} onRatingChange={setRating} />
       </div>
 
