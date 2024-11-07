@@ -8,13 +8,10 @@ import RouteForm from './components/RouteForm/RouteForm';
 import Map from './components/Map/Map';
 import RestaurantList from './components/RestaurantList/RestaurantList';
 import ChatBot from './components/ChatBot/ChatBot';
+import { StickyNavbar } from './components/StickyNavbar/StickyNavbar';
 import { Alert, AlertDescription } from './components/Alert';
-import { render } from "react-dom";
 import SlidingPane from "react-sliding-pane";
 import "react-sliding-pane/dist/react-sliding-pane.css";
-import {
-  ChevronDoubleRightIcon,
-} from "@heroicons/react/24/solid";
 
 const App: React.FC = () => {
   const { isLoaded, loadError } = useGoogleMaps();
@@ -142,6 +139,7 @@ const App: React.FC = () => {
       <button className="z-1 w-40 h-40 m-8 absolute top-0 bg-white" onClick={() => setIsPanelOpen(true)}>
         <div>Source Name</div>
         <div>Destination Name</div>
+        <div>Resturants list</div>
         <div>Click me
           {/* <ChevronDoubleRightIcon className="h-5 w-5" /> */}
         </div>
@@ -174,6 +172,7 @@ const App: React.FC = () => {
           <ChatBot />
         </div>
       </SlidingPane>
+      <StickyNavbar/>
     </div>
   );
 };
