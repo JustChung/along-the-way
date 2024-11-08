@@ -140,6 +140,7 @@ const App: React.FC = () => {
           />
       </div>
       <button className="z-1 w-40 h-40 mt-20 ml-2 absolute top-0 bg-white" onClick={() => setIsPanelOpen(true)}>
+        <div><b>Route Planner:</b></div>
         <div>Source Name</div>
         <div>Destination Name</div>
         <div>Resturants list</div>
