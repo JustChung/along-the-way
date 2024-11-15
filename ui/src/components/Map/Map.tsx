@@ -13,15 +13,19 @@ interface MapProps {
   onRestaurantSelect?: (restaurant: Restaurant) => void;
 }
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const libraries = ['places']
 
 const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destination, onRestaurantSelect }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  let libRef = React.useRef(libraries)
+
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: API_KEY,
-    libraries: ['places'],
+    // @ts-ignore
+    libraries: libRef.current,
   });
 
   const mapContainerStyle = {
