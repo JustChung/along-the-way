@@ -42,6 +42,7 @@ class MapsService {
     }
   }
 
+  // No longer needed
   getSamplePoints(path: google.maps.LatLng[], interval: number): Location[] {
     const points: Location[] = [];
     let distance = 0;
@@ -49,7 +50,7 @@ class MapsService {
     for (let i = 0; i < path.length - 1; i++) {
       const segmentPath = [path[i], path[i + 1]];
       const segmentLength = google.maps.geometry.spherical.computeLength(segmentPath);
-
+ 
       while (distance < segmentLength) {
         const fraction = distance / segmentLength;
         const point = google.maps.geometry.spherical.interpolate(path[i], path[i + 1], fraction);

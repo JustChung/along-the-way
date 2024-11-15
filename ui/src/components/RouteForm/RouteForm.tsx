@@ -6,10 +6,10 @@ import StarRating from './StarRating'; // Import StarRating component
 
 interface RouteFormProps {
   onSubmit: (data: RouteFormData) => void;
-  preferences: RoutePreferences | null; // Added preferences prop
+  preferences?: RoutePreferences | null; // Added preferences prop
 }
 
-interface RouteFormData {
+export interface RouteFormData {
   origin: string;
   destination: string;
   stops: number;
@@ -18,7 +18,7 @@ interface RouteFormData {
   preferences: RoutePreferences; // Ensure preferences are included in the form data
 }
 
-const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
+export const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
   const { register, handleSubmit } = useForm<RouteFormData>({
     defaultValues: {
       preferences: {
@@ -164,4 +164,4 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSubmit, preferences }) => {
   );
 };
 
-export default RouteForm;
+// export default RouteForm;

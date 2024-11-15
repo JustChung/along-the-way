@@ -91,7 +91,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         <Marker
           position={{ lat: origin.lat, lng: origin.lng }}
           icon={{
-            url: '/api/placeholder/32/32',
+            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
           title="Starting Point"
@@ -102,7 +102,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         <Marker
           position={{ lat: destination.lat, lng: destination.lng }}
           icon={{
-            url: '/api/placeholder/32/32',
+            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
           title="Destination"
@@ -129,7 +129,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
           position={{ lat: restaurant.location.lat, lng: restaurant.location.lng }}
           onClick={() => handleMarkerClick(restaurant)}
           icon={{
-            url: '/api/placeholder/32/32',
+            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
         />

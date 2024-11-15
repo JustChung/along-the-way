@@ -4,7 +4,7 @@ import { useGoogleMaps } from './hooks/useGoogleMaps';
 import { Location, Restaurant, RoutePreferences } from './types';
 import { mapsService } from './services/maps';
 import { api } from './services/api';
-import RouteForm from './components/RouteForm/RouteForm';
+import {RouteForm, RouteFormData} from './components/RouteForm/RouteForm';
 import Map from './components/Map/Map';
 import RestaurantList from './components/RestaurantList/RestaurantList';
 import ChatBot from './components/ChatBot/ChatBot';
@@ -155,7 +155,7 @@ const App: React.FC = () => {
       <SlidingPane
         isOpen={isPanelOpen}
         overlayClassName="z-[2]"
-        title={<h1 className="text-2xl font-bold text-gray-900">Route Planner</h1>}
+        title={<span className="text-2xl font-bold text-gray-900">Route Planner</span>}
         from="left"
         width="30%"
         onRequestClose={() => setIsPanelOpen(false)}
@@ -173,10 +173,10 @@ const App: React.FC = () => {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <RestaurantList 
+          {/* <RestaurantList 
             restaurants={restaurants} 
             onSelect={handleRestaurantSelect}
-          />
+          /> */}
           <ChatBot />
         </div>
       </SlidingPane>
