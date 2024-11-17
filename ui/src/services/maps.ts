@@ -1,13 +1,15 @@
 // src/services/maps.ts
+import axios from 'axios';
 import { Location, RoutePreferences } from '../types';
 
-class MapsService {
+class MapService {
   private readonly apiKey: string;
 
   constructor() {
     this.apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   }
 
+  // Google Maps JavaScript API methods
   async geocodeAddress(address: string): Promise<Location> {
     const geocoder = new google.maps.Geocoder();
 
@@ -27,7 +29,7 @@ class MapsService {
     }
   }
 
-  async getDirections(origin: Location, destination: Location): Promise<google.maps.DirectionsResult> {
+  async getDirectionsJS(origin: Location, destination: Location): Promise<google.maps.DirectionsResult> {
     const directionsService = new google.maps.DirectionsService();
 
     try {
@@ -42,32 +44,103 @@ class MapsService {
     }
   }
 
-  // No longer needed
-  getSamplePoints(path: google.maps.LatLng[], interval: number): Location[] {
-    const points: Location[] = [];
-    let distance = 0;
+  // Google Maps HTTP API methods
+  async getRestaurantsAlongRoute(routeData: google.maps.DirectionsResult, origin: Location) {
+    try {
+      const response = await axios.post(
+        'https://places.googleapis.com/v1/places:searchText', 
+        {
+          "textQuery": "restaurants",
+          "searchAlongRouteParameters": {
+            "polyline": {
+              "encodedPolyline": routeData.routes[0].overview_polyline
+            }
+          }
+        }, 
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': this.apiKey,
+            'X-Goog-FieldMask': '*',
+          },
+        }
+      );
 
-    for (let i = 0; i < path.length - 1; i++) {
-      const segmentPath = [path[i], path[i + 1]];
-      const segmentLength = google.maps.geometry.spherical.computeLength(segmentPath);
- 
-      while (distance < segmentLength) {
-        const fraction = distance / segmentLength;
-        const point = google.maps.geometry.spherical.interpolate(path[i], path[i + 1], fraction);
-
-        points.push({
-          lat: point.lat(),
-          lng: point.lng(),
-          address: '',
-        });
-
-        distance += interval;
-      }
-      distance = 0;  // Reset distance for the next segment
+      return response.data.places.map((place: any) => ({
+        id: place.place_id,
+        name: place.displayName,
+        location: {
+          lat: place.location.latitude,
+          lng: place.location.longitude,
+          address: place.adrFormatAddress,
+        },
+        rating: place.rating || 0,
+        priceLevel: place.priceLevel || 0,
+        photos: place.photos ? place.photos : [],
+        reviews: place.reviews,
+      }));
+    } catch (error) {
+      throw new Error(`Failed to fetch restaurants: ${error}`);
     }
+  }
 
-    return points;
+  async getDirectionsHTTP(origin: Location, destination: Location, preferences: RoutePreferences) {
+    try {
+      const response = await axios.get(`https://maps.googleapis.com/maps/api/directions/json`, {
+        params: {
+          origin: `${origin.lat},${origin.lng}`,
+          destination: `${destination.lat},${destination.lng}`,
+          key: this.apiKey,
+          alternatives: false,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch directions: ${error}`);
+    }
+  }
+
+  async getRestaurantDetails(placeId: string) {
+    try {
+      const service = new google.maps.places.PlacesService(
+        // We need a map instance or HTML element to create the service
+        new google.maps.Map(document.createElement('div'))
+      );
+  
+      return new Promise((resolve, reject) => {
+        service.getDetails(
+          {
+            placeId: placeId,
+            fields: ['place_id', 'name', 'formatted_address', 'rating', 'price_level', 'photos', 'reviews']
+          },
+          (result, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+              resolve({
+                id: result.place_id,
+                name: result.name,
+                address: result.formatted_address,
+                rating: result.rating || 0,
+                priceLevel: result.price_level || 0,
+                photos: result.photos 
+                  ? result.photos.map(photo => photo.getUrl({ maxWidth: 400 }))
+                  : [],
+                reviews: result.reviews?.map(review => ({
+                  author_name: review.author_name,
+                  rating: review.rating,
+                  text: review.text,
+                  time: review.time
+                })) || []
+              });
+            } else {
+              reject(new Error(`Place details request failed: ${status}`));
+            }
+          }
+        );
+      });
+    } catch (error) {
+      throw new Error(`Failed to fetch restaurant details: ${error}`);
+    }
   }
 }
 
-export const mapsService = new MapsService();
+export const mapService = new MapService();

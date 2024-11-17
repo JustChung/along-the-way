@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
 import { Location, Restaurant, RoutePreferences } from './types';
-import { mapsService } from './services/maps';
-import { api } from './services/api';
+import { mapService } from './services/maps';
 import {RouteForm, RouteFormData} from './components/RouteForm/RouteForm';
 import Map from './components/Map/Map';
 import RestaurantList from './components/RestaurantList/RestaurantList';
@@ -39,15 +38,15 @@ const App: React.FC = () => {
     try {
       // Geocode addresses
       const [originLocation, destLocation] = await Promise.all([
-        mapsService.geocodeAddress(origin),
-        mapsService.geocodeAddress(destination)
+        mapService.geocodeAddress(origin),
+        mapService.geocodeAddress(destination)
       ]);
   
       setOrigin(originLocation);
       setDestination(destLocation);
   
       // Get route
-      const routeData = await mapsService.getDirections(originLocation, destLocation);
+      const routeData = await await mapService.getDirectionsJS(originLocation, destLocation);;
   
       // Update map center to show the entire route
       if (routeData.routes[0]?.bounds) {
@@ -60,7 +59,7 @@ const App: React.FC = () => {
       }
   
       // Search for restaurants along the route
-      const foundRestaurants = await api.getRestaurants(routeData, originLocation);
+      const foundRestaurants = await mapService.getRestaurantsAlongRoute(routeData, originLocation);
       setRestaurants(foundRestaurants);
   
       if (foundRestaurants.length === 0) {
@@ -74,33 +73,8 @@ const App: React.FC = () => {
     }
   };  
 
-  const handleRestaurantSelect = async (restaurant: Restaurant) => {
+  const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
-    try {
-      // Fetch the restaurant details from the API
-      const details = await api.getRestaurantDetails(restaurant.id);
-  
-      // Create a new Restaurant object from the details
-      const newRestaurant: Restaurant = {
-        id: details.id,
-        name: details.name,
-        location: {
-          lat: 0, // Set default latitude or extract if available
-          lng: 0, // Set default longitude or extract if available
-          address: details.address, // Using address from details
-        },
-        rating: details.rating,
-        priceLevel: details.priceLevel,
-        cuisineType: ['Various'], // Default value for cuisineType
-        photos: details.photos || [], // Use provided photos or default to an empty array
-        reviews: details.reviews || [], // Use provided reviews or default to an empty array
-      };
-  
-      // Update the selected restaurant with the new Restaurant object
-      setSelectedRestaurant(newRestaurant);
-    } catch (error) {
-      console.error('Error fetching restaurant details:', error);
-    }
   };
     
 

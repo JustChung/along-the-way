@@ -1,8 +1,6 @@
-// src/components/Map/Map.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
-import { Location } from '../../types';
-import { Restaurant } from '../../types';
+import { Location, Restaurant } from '../../types';
 
 interface MapProps {
   center: Location;
@@ -12,19 +10,18 @@ interface MapProps {
   destination?: Location | null;
   onRestaurantSelect?: (restaurant: Restaurant) => void;
 }
+
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const libraries = ['places']
+const libraries = ['places'] as ('places')[];
 
 const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destination, onRestaurantSelect }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  let libRef = React.useRef(libraries)
-
+  const libRef = React.useRef(libraries);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: API_KEY,
-    // @ts-ignore
     libraries: libRef.current,
   });
 
@@ -41,6 +38,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
     setMap(null);
   }, []);
 
+  // Handle directions
   useEffect(() => {
     if (!isLoaded || !origin || !destination || !window.google) return;
 
@@ -60,7 +58,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         }
       }
     );
-  }, [origin, destination, isLoaded, map]);
+  }, [origin, destination, isLoaded]);
 
   const handleMarkerClick = useCallback((restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
@@ -93,9 +91,10 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
     >
       {origin && (
         <Marker
+          key="origin-marker"
           position={{ lat: origin.lat, lng: origin.lng }}
           icon={{
-            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
+            url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
           title="Starting Point"
@@ -104,9 +103,10 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
 
       {destination && (
         <Marker
+          key="destination-marker"
           position={{ lat: destination.lat, lng: destination.lng }}
           icon={{
-            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
+            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
           title="Destination"
@@ -115,6 +115,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
 
       {directions && (
         <DirectionsRenderer
+          key="directions-renderer"
           directions={directions}
           options={{
             suppressMarkers: true,
@@ -127,42 +128,49 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         />
       )}
 
-      {restaurants.map((restaurant) => (
+      {restaurants.map((restaurant, index) => (
         <Marker
-          key={restaurant.id}
+          key={restaurant.id || `restaurant-${index}`}
           position={{ lat: restaurant.location.lat, lng: restaurant.location.lng }}
           onClick={() => handleMarkerClick(restaurant)}
           icon={{
-            url: 'https://icons.veryicon.com/png/o/miscellaneous/simple-linear-icon/icon-point.png',
+            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
             scaledSize: new window.google.maps.Size(32, 32),
           }}
         />
       ))}
 
-      {selectedRestaurant && (
-        <InfoWindow
-          position={{
-            lat: selectedRestaurant.location.lat,
-            lng: selectedRestaurant.location.lng,
-          }}
-          onCloseClick={() => setSelectedRestaurant(null)}
-        >
-          <div className="p-2 max-w-xs">
-            <h3 className="font-bold text-lg mb-1">{selectedRestaurant.name}</h3>
-            <div className="text-sm text-gray-600 mb-1">
-              Rating: {selectedRestaurant.rating} ★
-            </div>
-            <div className="text-sm">
-              {'$'.repeat(selectedRestaurant.priceLevel)}
-            </div>
-            {selectedRestaurant.location.address && (
-              <div className="text-sm text-gray-600 mt-1">
-                {selectedRestaurant.location.address}
-              </div>
-            )}
+    {selectedRestaurant && (
+      <InfoWindow
+        key={`info-${selectedRestaurant.id}`}
+        position={{
+          lat: selectedRestaurant.location.lat,
+          lng: selectedRestaurant.location.lng,
+        }}
+        onCloseClick={() => setSelectedRestaurant(null)}
+      >
+        <div className="p-2 max-w-xs">
+          <h3 className="font-bold text-lg mb-1">
+            {typeof selectedRestaurant.name === 'object' && 'text' in selectedRestaurant.name
+              ? selectedRestaurant.name.text
+              : selectedRestaurant.name}
+          </h3>
+          <div className="text-sm text-gray-600 mb-1">
+            Rating: {selectedRestaurant.rating} ★
           </div>
-        </InfoWindow>
-      )}
+          <div className="text-sm">
+            {'$'.repeat(selectedRestaurant.priceLevel)}
+          </div>
+          {selectedRestaurant.location.address && (
+            <div className="text-sm text-gray-600 mt-1">
+              {typeof selectedRestaurant.location.address === 'object' && 'text' in selectedRestaurant.location.address
+                ? selectedRestaurant.location.address.text
+                : selectedRestaurant.location.address}
+            </div>
+          )}
+        </div>
+      </InfoWindow>
+    )}
     </GoogleMap>
   );
 };

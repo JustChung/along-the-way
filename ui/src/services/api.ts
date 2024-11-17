@@ -1,4 +1,5 @@
 // src/services/api.ts
+/*
 import axios from 'axios';
 import { Location, RoutePreferences } from '../types';
 
@@ -76,3 +77,4 @@ export const api = {
     };
   },
 };
+*/

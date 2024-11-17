@@ -15,16 +15,23 @@ export interface RoutePreferences {
     searchRadius?: number; // Optional field
 }
 
+export interface LocalizedText {
+    text: string;
+    languageCode: string;
+}
   
 export interface Restaurant {
     id: string;
-    name: string;
-    location: Location;
+    name: string | LocalizedText;
+    location: {
+      lat: number;
+      lng: number;
+      address: string | LocalizedText;
+    };
     rating: number;
     priceLevel: number;
-    cuisineType: string[];
-    photos: string[];
-    reviews: Review[];
+    photos?: string[];
+    reviews?: any[];
 }
   
 export interface Review {
