@@ -1,6 +1,6 @@
 // src/components/RouteChip/RouteChip.tsx
 
-import { Input } from "@material-tailwind/react";
+import { Input, Card, CardBody, Typography, CardFooter } from "@material-tailwind/react";
 import React from 'react';
 import { Restaurant } from '../../types';
 
@@ -14,18 +14,18 @@ interface RouteChipProps {
 const RouteChip: React.FC<RouteChipProps> = ({ source, destination, stops, onSelect }) => {
   return (
     <div className="space-y-4">
-      {stops.map((stop) => (
-        <div
-          key={restaurant.id}
-          className="p-4 border rounded hover:bg-gray-50 cursor-pointer"
-          onClick={() => onSelect(restaurant)}
-        >
-          <h3 className="font-bold">{restaurant.name}</h3>
-          <div className="text-sm text-gray-600">
-            Rating: {restaurant.rating} • Price Level: {'$'.repeat(restaurant.priceLevel)}
-          </div>
-        </div>
-      ))}
+      <Card className="mt-6 w-96">
+        <CardBody>
+          <Typography variant="h5" color="blue-gray" className="mb-2">
+            Route
+          </Typography>
+          <Input label="Input With Icon" value="test" icon={<i className="fas fa-heart" />} />
+          <Input label="Input With Icon" value="test" icon={<i className="fas fa-heart" />} />
+        </CardBody>
+        <CardFooter className="pt-0">
+          <Button>Read More</Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 };
