@@ -143,7 +143,11 @@ const App: React.FC = () => {
             restaurants={restaurants} 
             onSelect={handleRestaurantSelect}
           /> */}
-          <ChatBot />
+          <ChatBot 
+            restaurants={restaurants}
+            origin={origin?.address}
+            destination={destination?.address}
+          />
         </div>
       </SlidingPane>
     </div>

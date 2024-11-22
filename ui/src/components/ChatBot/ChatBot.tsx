@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Restaurant } from '../../types';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -10,9 +11,15 @@ interface Message {
   timestamp: Date;
 }
 
-const ChatBot: React.FC = () => {
+interface ChatBotProps {
+  restaurants?: Restaurant[];
+  origin?: string;
+  destination?: string;
+}
+
+const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination }) => {
   const [messages, setMessages] = useState<Message[]>([{
-    text: "Hello! I'm your restaurant assistant. Feel free to ask me about restaurants, cuisines, or dining recommendations!",
+    text: "Hello! I'm your restaurant assistant. I can help you find restaurants along your route and answer questions about them. What would you like to know?",
     isUser: false,
     timestamp: new Date()
   }]);
@@ -29,13 +36,34 @@ const ChatBot: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  const generateContext = () => {
+    const restaurantInfo = restaurants.map(restaurant => ({
+      name: typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name,
+      address: typeof restaurant.location.address === 'object' ? restaurant.location.address.text : restaurant.location.address,
+      rating: restaurant.rating,
+      priceLevel: restaurant.priceLevel
+    }));
+
+    return `
+      Context: You are a restaurant assistant helping users find restaurants along their route from ${origin || 'their starting point'} to ${destination || 'their destination'}.
+      
+      Available restaurants along the route:
+      ${JSON.stringify(restaurantInfo, null, 2)}
+
+      When answering questions:
+      1. Use the actual restaurant data provided above
+      2. If asked about restaurants not in the list, mention you can only provide information about restaurants along their specific route
+      3. You can provide ratings, price levels, and addresses for the restaurants in the list
+      4. Price levels are represented as numbers 1-4 ($ to $$$$)
+    `;
+  };
+
   const generateResponse = async (userInput: string) => {
     try {
-      // Create a new chat for each interaction since we're managing history ourselves
       const chat = chatModel.startChat();
+      const context = generateContext();
       
-      // Send the current message
-      const result = await chat.sendMessage(userInput);
+      const result = await chat.sendMessage(`${context}\n\nUser question: ${userInput}`);
       const response = await result.response.text();
       
       if (!response) {
@@ -75,7 +103,7 @@ const ChatBot: React.FC = () => {
     } catch (error) {
       console.error('Error in chat:', error);
       const errorMessage: Message = {
-        text: "I apologize, but I'm having technical difficulties. Please try asking your question again, focusing on restaurants and dining recommendations.",
+        text: "I apologize, but I'm having technical difficulties. Please try asking your question again.",
         isUser: false,
         timestamp: new Date(),
       };
@@ -93,6 +121,11 @@ const ChatBot: React.FC = () => {
     <div className="flex flex-col h-[400px] border rounded-lg bg-white shadow-sm">
       <div className="bg-blue-600 p-3 rounded-t-lg">
         <h2 className="text-white font-semibold">Restaurant Assistant</h2>
+        {restaurants.length > 0 && (
+          <p className="text-blue-100 text-sm">
+            {restaurants.length} restaurants found along your route
+          </p>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
