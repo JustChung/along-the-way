@@ -11,6 +11,7 @@ import { StickyNavbar } from './components/StickyNavbar/StickyNavbar';
 import { Alert, AlertDescription } from './components/Alert';
 import SlidingPane from "react-sliding-pane";
 import "react-sliding-pane/dist/react-sliding-pane.css";
+import RouteCard from './components/RouteCard/RouteCard';
 
 const App: React.FC = () => {
   const { isLoaded, loadError } = useGoogleMaps();
@@ -113,16 +114,8 @@ const App: React.FC = () => {
             onRestaurantSelect={handleRestaurantSelect}
           />
       </div>
-      <div className="z-1 mt-20 ml-2 absolute top-0">
-        <button className="w-40 h-40 bg-white" onClick={() => setIsPanelOpen(true)}>
-          <div><b>Route Planner:</b></div>
-          <div>Source Name</div>
-          <div>Destination Name</div>
-          <div>Resturants list</div>
-          <div>Click me
-            {/* <ChevronDoubleRightIcon className="h-5 w-5" /> */}
-          </div>
-        </button>
+      <div className="z-1 mt-16 ml-4 absolute top-0">
+        <RouteCard source={origin?.address} destination={destination?.address} onSelect={() => setIsPanelOpen(true)}/>
         {/* List */}
       </div>
       {/* Documentation: https://www.npmjs.com/package/react-sliding-pane */}
