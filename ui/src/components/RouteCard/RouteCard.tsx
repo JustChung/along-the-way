@@ -15,7 +15,7 @@ interface RouteCardProps {
 const RouteCard: React.FC<RouteCardProps> = ({ source, destination, stops, onSelect }) => {
   return (
     <div className="space-y-4">
-      <Card className="mt-6 w-96" onClick={onSelect}>
+      <Card className="mt-6 w-96 opacity-[.96]" onClick={onSelect}>
         <CardBody>
           <Typography variant="h5" color="blue-gray" className="mb-2 gap-2 flex items-center">
             <MapIcon className="w-8 p-1"/><span className="text-center">Route</span>
