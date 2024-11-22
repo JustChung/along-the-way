@@ -1,11 +1,10 @@
 // src/App.tsx
 import React, { useState } from 'react';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
-import { Location, Restaurant, RoutePreferences } from './types';
+import { Location, Restaurant} from './types';
 import { mapService } from './services/maps';
 import {RouteForm, RouteFormData} from './components/RouteForm/RouteForm';
 import Map from './components/Map/Map';
-import RestaurantList from './components/RestaurantList/RestaurantList';
 import ChatBot from './components/ChatBot/ChatBot';
 import { StickyNavbar } from './components/StickyNavbar/StickyNavbar';
 import { Alert, AlertDescription } from './components/Alert';
