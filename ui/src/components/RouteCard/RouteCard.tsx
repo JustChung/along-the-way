@@ -4,14 +4,14 @@ import { Input, Card, CardBody, Typography, CardFooter } from "@material-tailwin
 import React from 'react';
 import { Restaurant } from '../../types';
 
-interface RouteChipProps {
+interface RouteCardProps {
     source: String;
     destination: String;
     stops: Restaurant[];
     onSelect: (restaurant: Restaurant) => void;
 }
 
-const RouteChip: React.FC<RouteChipProps> = ({ source, destination, stops, onSelect }) => {
+const RouteCard: React.FC<RouteCardProps> = ({ source, destination, stops, onSelect }) => {
   return (
     <div className="space-y-4">
       <Card className="mt-6 w-96">
@@ -30,4 +30,4 @@ const RouteChip: React.FC<RouteChipProps> = ({ source, destination, stops, onSel
   );
 };
 
-export default RouteChip;
+export default RouteCard;

@@ -3,12 +3,12 @@
 import React from 'react';
 import { Restaurant } from '../../types';
 
-interface RestaurantListChipProps {
+interface RestaurantListCardProps {
   restaurants: Restaurant[];
   onSelect: (restaurant: Restaurant) => void;
 }
 
-const RestaurantListChip: React.FC<RestaurantListChipProps> = ({ restaurants, onSelect }) => {
+const RestaurantListCard: React.FC<RestaurantListCardProps> = ({ restaurants, onSelect }) => {
   return (
     <div className="space-y-4">
       {restaurants.map((restaurant) => (
@@ -27,4 +27,4 @@ const RestaurantListChip: React.FC<RestaurantListChipProps> = ({ restaurants, on
   );
 };
 
-export default RestaurantListChip;
+export default RestaurantListCard;
