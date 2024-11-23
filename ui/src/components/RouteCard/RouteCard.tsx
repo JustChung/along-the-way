@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
+import { usePlacesAutocomplete } from '../../hooks/usePlacesAutocomplete';
 
 interface RouteCardProps {
   onSubmit: (data: {
@@ -19,6 +20,36 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
+  const originAutocomplete = usePlacesAutocomplete("origin-input", {
+    types: ['address'],
+    componentRestrictions: { country: 'us' }
+  });
+
+  const destinationAutocomplete = usePlacesAutocomplete("destination-input", {
+    types: ['address'],
+    componentRestrictions: { country: 'us' }
+  });
+
+  useEffect(() => {
+    if (originAutocomplete) {
+      originAutocomplete.addListener('place_changed', () => {
+        const place = originAutocomplete.getPlace();
+        if (place.formatted_address) {
+          setOrigin(place.formatted_address);
+        }
+      });
+    }
+
+    if (destinationAutocomplete) {
+      destinationAutocomplete.addListener('place_changed', () => {
+        const place = destinationAutocomplete.getPlace();
+        if (place.formatted_address) {
+          setDestination(place.formatted_address);
+        }
+      });
+    }
+  }, [originAutocomplete, destinationAutocomplete]);
+
   const handleSubmit = () => {
     onSubmit({
       origin,
@@ -34,14 +65,15 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center gap-2 mb-4">
-            <MapIcon className="w-8 p-1"/>
+            <MapIcon className="w-8 h-8 p-1"/>
             <span className="text-xl font-semibold text-gray-800">Route</span>
           </div>
           
           {/* Origin Input */}
           <div className="relative">
-            <MapPinIcon className="absolute left-2 top-2.5 w-5 text-green-600"/>
+            <MapPinIcon className="absolute left-2 top-2.5 w-5 h-5 text-green-600"/>
             <input
+              id="origin-input"
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               placeholder="Enter starting point"
@@ -51,8 +83,9 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
 
           {/* Destination Input */}
           <div className="relative">
-            <MapPinIcon className="absolute left-2 top-2.5 w-5 text-red-600"/>
+            <MapPinIcon className="absolute left-2 top-2.5 w-5 h-5 text-red-600"/>
             <input
+              id="destination-input"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder="Enter destination"
