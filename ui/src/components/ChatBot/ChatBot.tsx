@@ -9,18 +9,34 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  extractedData?: RouteRequest | null;
+}
+
+interface RouteRequest {
+  origin?: string;
+  destination?: string;
+  stops?: number;
+  rating?: number;
+  maxDetourMinutes?: number;
+  needsConfirmation?: boolean;
 }
 
 interface ChatBotProps {
   restaurants?: Restaurant[];
   origin?: string;
   destination?: string;
+  onRouteRequest?: (data: RouteRequest) => void;
 }
 
-const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination }) => {
+const ChatBot: React.FC<ChatBotProps> = ({ 
+  restaurants = [], 
+  origin, 
+  destination,
+  onRouteRequest 
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
-    text: "Hello! I'm your restaurant assistant. I can help you find restaurants along your route and answer questions about them. What would you like to know?",
+    text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants or tell me where you want to go. For example, try saying 'Find restaurants between Los Angeles and San Diego' or 'I want to drive from NYC to Boston and find highly rated restaurants'.",
     isUser: false,
     timestamp: new Date()
   }]);
@@ -42,21 +58,46 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
       name: typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name,
       address: typeof restaurant.location.address === 'object' ? restaurant.location.address.text : restaurant.location.address,
       rating: restaurant.rating,
-      priceLevel: restaurant.priceLevel
+      priceLevel: restaurant.priceLevel,
+      detourMinutes: restaurant.detourMinutes,
+      facilities: restaurant.facilities,
+      regularOpeningHours: restaurant.regularOpeningHours
     }));
 
     return `
-      Context: You are a restaurant assistant helping users find restaurants along their route from ${origin || 'their starting point'} to ${destination || 'their destination'}.
+      Context: You are a restaurant assistant helping users find restaurants along their route.
+      Current route: ${origin ? `from ${origin}` : ''} ${destination ? `to ${destination}` : ''}
       
       Available restaurants along the route:
       ${JSON.stringify(restaurantInfo, null, 2)}
 
-      When answering questions:
-      1. Use the actual restaurant data provided above
-      2. If asked about restaurants not in the list, mention you can only provide information about restaurants along their specific route
-      3. You can provide ratings, price levels, and addresses for the restaurants in the list
-      4. Price levels are represented as numbers 1-4 ($ to $$$$)
+      When responding:
+      1. If the user asks about finding restaurants between locations, extract:
+         - Origin location
+         - Destination location
+         - Number of stops (if mentioned)
+         - Minimum rating (if mentioned)
+         - Maximum detour time (if mentioned, default to 10 minutes)
+         Return this as JSON wrapped in [ROUTE_REQUEST] tags
+
+      2. For restaurant questions:
+         - Provide specific details about restaurants
+         - Include ratings, price levels, and special features
+         - Mention detour times from the main route
+         - Group similar restaurants together
     `;
+  };
+
+  const extractRouteRequest = (response: string): RouteRequest | null => {
+    const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
+    if (match) {
+      try {
+        return JSON.parse(match[1]);
+      } catch (e) {
+        console.error('Failed to parse route request:', e);
+      }
+    }
+    return null;
   };
 
   const generateResponse = async (userInput: string) => {
@@ -64,9 +105,18 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
       const chat = chatModel.startChat();
       const context = generateContext();
       
-      const result = await chat.sendMessage(`${context}\n\nUser question: ${userInput}`);
-      const response = await result.response.text();
+      const result = await chat.sendMessage(`
+        ${context}
+        
+        User message: ${userInput}
+        
+        Instructions:
+        1. If this is a route request, first extract the route information and wrap it in [ROUTE_REQUEST] tags as JSON
+        2. Then provide a natural, conversational response
+        3. If this is about specific restaurants, provide detailed information about them
+      `);
       
+      const response = await result.response.text();
       if (!response) {
         throw new Error('Empty response received');
       }
@@ -78,9 +128,43 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
     }
   };
 
+  const handleRouteRequest = (request: RouteRequest) => {
+    // Add confirmation message
+    setMessages(prev => [...prev, {
+      text: `I found these route details:\n
+- From: ${request.origin}
+- To: ${request.destination}${request.stops ? `\n- Number of stops: ${request.stops}` : ''}${request.rating ? `\n- Minimum rating: ${request.rating} stars` : ''}${request.maxDetourMinutes ? `\n- Maximum detour: ${request.maxDetourMinutes} minutes` : ''}
+
+Would you like me to search for restaurants with these preferences? Please confirm with yes or no.`,
+      isUser: false,
+      timestamp: new Date(),
+      extractedData: { ...request, needsConfirmation: true }
+    }]);
+  };
+
+  const handleConfirmation = (userInput: string, lastRequest: RouteRequest) => {
+    const isConfirmed = userInput.toLowerCase().includes('yes');
+    
+    if (isConfirmed && onRouteRequest) {
+      onRouteRequest(lastRequest);
+      setMessages(prev => [...prev, {
+        text: "Great! I'm searching for restaurants along your route now...",
+        isUser: false,
+        timestamp: new Date()
+      }]);
+    } else {
+      setMessages(prev => [...prev, {
+        text: "No problem! Feel free to tell me your route preferences again or ask about something else.",
+        isUser: false,
+        timestamp: new Date()
+      }]);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
+    // Add user message
     const userMessage: Message = {
       text: input,
       isUser: true,
@@ -92,32 +176,48 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
     setIsLoading(true);
 
     try {
+      // Check if we're awaiting confirmation
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.extractedData?.needsConfirmation) {
+        handleConfirmation(input, lastMessage.extractedData);
+        setIsLoading(false);
+        return;
+      }
+
+      // Generate new response
       const response = await generateResponse(input);
       
-      const aiMessage: Message = {
-        text: response,
-        isUser: false,
-        timestamp: new Date(),
-      };
+      // Extract route request if present
+      const routeRequest = extractRouteRequest(response);
+      const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
 
-      setMessages(prev => [...prev, aiMessage]);
+      if (routeRequest) {
+        handleRouteRequest(routeRequest);
+      } else {
+        setMessages(prev => [...prev, {
+          text: cleanResponse,
+          isUser: false,
+          timestamp: new Date()
+        }]);
+      }
     } catch (error) {
       console.error('Error in chat:', error);
-      const errorMessage: Message = {
+      setMessages(prev => [...prev, {
         text: "I apologize, but I'm having technical difficulties. Please try asking your question again.",
         isUser: false,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+        timestamp: new Date()
+      }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Rest of the component remains the same (UI rendering code)
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Collapsed state UI
   if (!isExpanded) {
     return (
       <button
@@ -126,7 +226,6 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
       >
         <div className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-200 ease-in-out p-4">
           <div className="flex flex-col items-center gap-1">
-            {/* Chat icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -142,7 +241,6 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
               />
             </svg>
             
-            {/* Restaurant count */}
             {restaurants.length > 0 && (
               <span className="text-sm font-medium">
                 {restaurants.length} Found
@@ -151,7 +249,6 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
           </div>
         </div>
 
-        {/* Message count badge */}
         {messages.length > 1 && (
           <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-white text-sm flex items-center justify-center">
             {messages.length - 1}
@@ -161,8 +258,9 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
     );
   }
 
+  // Expanded state UI
   return (
-    <div className="flex flex-col h-[400px] w-[350px] border rounded-lg bg-white shadow-lg">
+    <div className="flex flex-col h-[500px] w-[400px] border rounded-lg bg-white shadow-lg">
       <div className="bg-blue-600 p-3 rounded-t-lg flex justify-between items-center">
         <div>
           <h2 className="text-white font-semibold">Restaurant Assistant</h2>
@@ -206,9 +304,9 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
                   : 'bg-gray-100 text-gray-800 rounded-bl-none'
               }`}
             >
-              <div className="text-sm">{message.text}</div>
+              <div className="text-sm whitespace-pre-wrap">{message.text}</div>
               <div className={`text-xs mt-1 ${message.isUser ? 'text-blue-100' : 'text-gray-500'}`}>
-                {formatTime(new Date(message.timestamp))}
+                {formatTime(message.timestamp)}
               </div>
             </div>
           </div>
@@ -234,7 +332,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ restaurants = [], origin, destination
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ask about restaurants..."
+            placeholder="Ask about restaurants or enter your route..."
             onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
             disabled={isLoading}
           />

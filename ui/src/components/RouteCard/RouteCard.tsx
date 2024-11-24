@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { MapIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { usePlacesAutocomplete } from '../../hooks/usePlacesAutocomplete';
@@ -13,13 +13,23 @@ interface RouteCardProps {
   }) => void;
 }
 
-const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
+export interface RouteCardRef {
+  updateFields: (data: {
+    origin?: string;
+    destination?: string;
+    stops?: number;
+    rating?: number;
+    maxDetourMinutes?: number;
+  }) => void;
+}
+
+const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [stops, setStops] = useState<number | null>(null);
   const [rating, setRating] = useState<number>(0);
-  const [maxDetourMinutes, setMaxDetourMinutes] = useState<number>(10); // Default 10 minutes
+  const [maxDetourMinutes, setMaxDetourMinutes] = useState<number>(10);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
   const originAutocomplete = usePlacesAutocomplete("origin-input", {
@@ -31,6 +41,25 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
     types: ['address'],
     componentRestrictions: { country: 'us' }
   });
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    updateFields: (data) => {
+      if (data.origin !== undefined) setOrigin(data.origin);
+      if (data.destination !== undefined) setDestination(data.destination);
+      if (data.stops !== undefined) setStops(data.stops);
+      if (data.rating !== undefined) {
+        setRating(data.rating);
+        setHoverRating(0); // Reset hover state when rating is updated externally
+      }
+      if (data.maxDetourMinutes !== undefined) setMaxDetourMinutes(data.maxDetourMinutes);
+      
+      // Show options if any advanced options are provided
+      if (data.stops !== undefined || data.rating !== undefined || data.maxDetourMinutes !== undefined) {
+        setShowOptions(true);
+      }
+    }
+  }));
 
   useEffect(() => {
     if (originAutocomplete) {
@@ -189,6 +218,6 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
       </div>
     </div>
   );
-};
+});
 
 export default RouteCard;

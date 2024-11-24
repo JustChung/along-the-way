@@ -30,6 +30,8 @@ const App: React.FC = () => {
     address: 'Los Angeles, CA'
   });
 
+  const routeCardRef = React.useRef<HTMLDivElement>(null);
+
   const handleRouteSubmit = async (data: RouteSubmitData) => {
     setIsLoading(true);
     setError(null);
@@ -82,6 +84,43 @@ const App: React.FC = () => {
     setSelectedRestaurant(restaurant);
   };
 
+  const handleChatBotRouteRequest = (request: {
+    origin?: string;
+    destination?: string;
+    stops?: number;
+    rating?: number;
+    maxDetourMinutes?: number;
+  }) => {
+    // Validate required fields
+    if (!request.origin || !request.destination) {
+      setError('Origin and destination are required.');
+      return;
+    }
+
+    // Create route submit data with defaults for missing values
+    const routeData: RouteSubmitData = {
+      origin: request.origin,
+      destination: request.destination,
+      stops: request.stops ?? null,
+      rating: request.rating ?? 0,
+      maxDetourMinutes: request.maxDetourMinutes ?? 10
+    };
+
+    // Update RouteCard fields using the ref
+    if (routeCardRef.current) {
+      routeCardRef.current.updateFields({
+        origin: request.origin,
+        destination: request.destination,
+        stops: request.stops,
+        rating: request.rating,
+        maxDetourMinutes: request.maxDetourMinutes
+      });
+    }
+
+    // Submit the route request
+    handleRouteSubmit(routeData);
+  };
+
   if (loadError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -124,7 +163,11 @@ const App: React.FC = () => {
 
       {/* Route Card and Status Messages */}
       <div className="absolute top-20 left-4 z-20 space-y-4">
-        <RouteCard onSubmit={handleRouteSubmit} />
+        {/* Add ref to RouteCard */}
+        <RouteCard 
+          ref={routeCardRef}
+          onSubmit={handleRouteSubmit} 
+        />
         
         {/* Loading Indicator */}
         {isLoading && (
@@ -150,6 +193,7 @@ const App: React.FC = () => {
           restaurants={restaurants}
           origin={origin?.address}
           destination={destination?.address}
+          onRouteRequest={handleChatBotRouteRequest}
         />
       </div>
     </div>
