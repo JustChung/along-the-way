@@ -13,6 +13,7 @@ interface RouteSubmitData {
   destination: string;
   stops: number;
   rating: number;
+  maxDetourMinutes: number;
 }
 
 const App: React.FC = () => {
@@ -58,7 +59,7 @@ const App: React.FC = () => {
       const result = await mapService.getRestaurantsAlongRoute(
         routeData, 
         originLocation,
-        { maxStops: data.stops, minRating: data.rating }
+        { maxStops: data.stops, minRating: data.rating, maxDetourMinutes: data.maxDetourMinutes }
       );
       
       setRestaurants(result.restaurants);

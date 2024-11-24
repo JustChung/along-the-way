@@ -9,6 +9,7 @@ interface RouteCardProps {
     destination: string;
     stops: number | null;
     rating: number;
+    maxDetourMinutes: number;
   }) => void;
 }
 
@@ -18,6 +19,7 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
   const [showOptions, setShowOptions] = useState(false);
   const [stops, setStops] = useState<number | null>(null);
   const [rating, setRating] = useState<number>(0);
+  const [maxDetourMinutes, setMaxDetourMinutes] = useState<number>(10); // Default 10 minutes
   const [hoverRating, setHoverRating] = useState<number>(0);
 
   const originAutocomplete = usePlacesAutocomplete("origin-input", {
@@ -55,7 +57,8 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
       origin,
       destination,
       stops,
-      rating
+      rating,
+      maxDetourMinutes
     });
   };
 
@@ -109,6 +112,27 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
           {/* Expanded Options */}
           {showOptions && (
             <div className="space-y-4 pt-2">
+              {/* Maximum Detour Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum detour time (minutes)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="5"
+                    max="30"
+                    step="5"
+                    value={maxDetourMinutes}
+                    onChange={(e) => setMaxDetourMinutes(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="text-sm text-gray-600 min-w-[3rem]">
+                    {maxDetourMinutes} min
+                  </span>
+                </div>
+              </div>
+
               {/* Number of Stops */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -117,7 +141,7 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
                 <input
                   type="number"
                   min="0"
-                  value={stops === null ? "" : stops} // Handle null in the input
+                  value={stops === null ? "" : stops}
                   onChange={(e) => {
                     const value = e.target.value === "" ? null : parseInt(e.target.value);
                     setStops(value);

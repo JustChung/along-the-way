@@ -5,11 +5,24 @@ import { Location, Restaurant } from '../types';
 interface SearchOptions {
   maxStops: number | null;
   minRating: number;
+  maxDetourMinutes: number;
 }
 
 interface RestaurantSearchResult {
   restaurants: Restaurant[];
   message?: string;
+}
+
+interface DistanceMatrixResult {
+  originAddresses: string[];
+  destinationAddresses: string[];
+  rows: {
+    elements: {
+      status: string;
+      duration: { value: number; text: string; };
+      distance: { value: number; text: string; };
+    }[];
+  }[];
 }
 
 // Helper function to convert price level string to number
@@ -109,6 +122,59 @@ class MapService {
     }
   }
 
+  private async calculateDetourTime(
+    routePoint: google.maps.LatLng,
+    restaurant: { location: { lat: number; lng: number } },
+    service: google.maps.DistanceMatrixService
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      service.getDistanceMatrix(
+        {
+          origins: [routePoint],
+          destinations: [new google.maps.LatLng(restaurant.location.lat, restaurant.location.lng)],
+          travelMode: google.maps.TravelMode.DRIVING,
+          unitSystem: google.maps.UnitSystem.METRIC,
+        },
+        (response, status) => {
+          if (status === 'OK' && response) {
+            const duration = response.rows[0].elements[0].duration.value;
+            resolve(duration / 60); // Convert seconds to minutes
+          } else {
+            reject(new Error('Failed to calculate detour time'));
+          }
+        }
+      );
+    });
+  }
+
+  private async findNearestPointOnRoute(
+    route: google.maps.DirectionsRoute,
+    restaurant: { location: { lat: number; lng: number } }
+  ): Promise<{ point: google.maps.LatLng; distance: number }> {
+    const path = route.overview_path;
+    let minDistance = Infinity;
+    let nearestPoint = path[0];
+    
+    const restaurantLatLng = new google.maps.LatLng(
+      restaurant.location.lat,
+      restaurant.location.lng
+    );
+
+    for (let i = 0; i < path.length; i++) {
+      const distance = google.maps.geometry.spherical.computeDistanceBetween(
+        path[i],
+        restaurantLatLng
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestPoint = path[i];
+      }
+    }
+
+    return { point: nearestPoint, distance: minDistance };
+  }
+
   async getRestaurantsAlongRoute(
     routeData: google.maps.DirectionsResult,
     origin: Location,
@@ -119,6 +185,7 @@ class MapService {
     }
 
     try {
+      // First, get all restaurants along the route
       const response = await axios.post(
         `${this.placesApiBaseUrl}:searchText`,
         {
@@ -128,7 +195,7 @@ class MapService {
               encodedPolyline: routeData.routes[0].overview_polyline
             }
           },
-          maxResultCount: 50, // Adjust based on your needs
+          maxResultCount: 50,
           languageCode: "en"
         },
         {
@@ -144,6 +211,7 @@ class MapService {
         return { restaurants: [], message: 'No restaurants found along the route' };
       }
 
+      // Process basic restaurant data
       let restaurants = response.data.places.map((place: any) => ({
         id: place.id,
         name: place.displayName,
@@ -189,18 +257,53 @@ class MapService {
         priceRange: place.priceRange,
         businessStatus: place.businessStatus,
         types: place.types,
-        distanceFromStart: this.calculateDistanceFromStart(
-          origin,
-          { lat: place.location.latitude, lng: place.location.longitude }
-        )
+        distanceFromStart: 0, // Will be calculated later
+        detourMinutes: 0
       }));
 
-      // Filter by rating if specified
-      if (options.minRating > 0) {
-        restaurants = restaurants.filter(restaurant => 
-          restaurant.rating >= options.minRating
+      // Calculate detour times for each restaurant
+      const distanceMatrixService = new google.maps.DistanceMatrixService();
+      const mainRoute = routeData.routes[0];
+
+      // Process restaurants in batches to avoid rate limiting
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < restaurants.length; i += BATCH_SIZE) {
+        const batch = restaurants.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(async (restaurant) => {
+            try {
+              // Find nearest point on route
+              const { point } = await this.findNearestPointOnRoute(mainRoute, restaurant);
+              
+              // Calculate detour time
+              const detourTime = await this.calculateDetourTime(
+                point,
+                restaurant,
+                distanceMatrixService
+              );
+              
+              restaurant.detourMinutes = detourTime;
+              restaurant.distanceFromStart = this.calculateDistanceFromStart(
+                origin,
+                { lat: restaurant.location.lat, lng: restaurant.location.lng }
+              );
+            } catch (error) {
+              console.error(`Error calculating detour for restaurant ${restaurant.id}:`, error);
+              restaurant.detourMinutes = Infinity;
+            }
+          })
         );
       }
+
+      // Filter restaurants based on criteria
+      restaurants = restaurants
+        .filter(restaurant => 
+          restaurant.rating >= options.minRating &&
+          restaurant.detourMinutes <= options.maxDetourMinutes
+        )
+        .sort((a, b) => a.detourMinutes - b.detourMinutes);
+
+      console.log(restaurants)
 
       // Handle max stops logic
       if (options.maxStops && options.maxStops > 0) {
@@ -208,12 +311,15 @@ class MapService {
           restaurants,
           options.maxStops
         );
-        return { restaurants: selectedRestaurants, message };
+        return { 
+          restaurants: selectedRestaurants,
+          message: `${message} All restaurants are within ${options.maxDetourMinutes} minutes of your route.`
+        };
       }
 
       return {
-        restaurants: restaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart),
-        message: `Found ${restaurants.length} restaurants along your route`
+        restaurants,
+        message: `Found ${restaurants.length} restaurants within ${options.maxDetourMinutes} minutes of your route.`
       };
     } catch (error) {
       console.error('Error fetching restaurants:', error);
