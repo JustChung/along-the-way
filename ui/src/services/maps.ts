@@ -79,7 +79,7 @@ class MapService {
           },
         }
       );
-
+  
       let restaurants = response.data.places.map((place: any) => ({
         id: place.place_id,
         name: place.displayName,
@@ -94,32 +94,81 @@ class MapService {
         reviews: place.reviews,
         distanceFromStart: place.distanceMeters || 0
       }));
-
+  
       // Sort restaurants by distance from start of route
       restaurants = restaurants.sort((a, b) => 
         a.distanceFromStart - b.distanceFromStart
       );
-
+  
       // Filter by rating if specified
       if (options.minRating > 0) {
         restaurants = restaurants.filter(restaurant => 
           restaurant.rating >= options.minRating
         );
       }
-
+  
       let message: string | undefined;
-
-      // Handle stops limit and messaging
+      let selectedRestaurants: typeof restaurants = [];
+  
       if (options.maxStops && options.maxStops > 0) {
         const totalAvailable = restaurants.length;
+        
+        if (totalAvailable === 0) {
+          message = "No restaurants found along your route.";
+          return { restaurants: [], message };
+        }
+  
         if (totalAvailable < options.maxStops) {
           message = `You requested ${options.maxStops} stops, but only ${totalAvailable} restaurants were found along your route.`;
-        } else if (totalAvailable > options.maxStops) {
-          message = `Showing ${options.maxStops} of ${totalAvailable} available restaurants along your route.`;
-          restaurants = restaurants.slice(0, options.maxStops);
+          return { restaurants, message };
         }
+  
+        // Get total route distance
+        const totalDistance = restaurants[restaurants.length - 1].distanceFromStart;
+        
+        // Calculate ideal segment size
+        const segmentSize = totalDistance / options.maxStops;
+        
+        // Create segments and select one restaurant from each
+        for (let i = 0; i < options.maxStops; i++) {
+          const segmentStart = i * segmentSize;
+          const segmentEnd = (i + 1) * segmentSize;
+          
+          // Find restaurants in this segment
+          const segmentRestaurants = restaurants.filter(r => 
+            r.distanceFromStart >= segmentStart && 
+            r.distanceFromStart < segmentEnd
+          );
+          
+          if (segmentRestaurants.length > 0) {
+            // Select the highest-rated restaurant in the segment
+            const bestRestaurant = segmentRestaurants.reduce((prev, current) => 
+              (current.rating > prev.rating) ? current : prev
+            );
+            selectedRestaurants.push(bestRestaurant);
+          }
+        }
+  
+        // If we couldn't find restaurants in some segments, fill in with remaining restaurants
+        if (selectedRestaurants.length < options.maxStops) {
+          const remainingNeeded = options.maxStops - selectedRestaurants.length;
+          const selectedIds = new Set(selectedRestaurants.map(r => r.id));
+          const remainingRestaurants = restaurants
+            .filter(r => !selectedIds.has(r.id))
+            .sort((a, b) => b.rating - a.rating)
+            .slice(0, remainingNeeded);
+          
+          selectedRestaurants = [...selectedRestaurants, ...remainingRestaurants]
+            .sort((a, b) => a.distanceFromStart - b.distanceFromStart);
+        }
+  
+        message = `Showing ${selectedRestaurants.length} restaurants distributed along your route.`;
+        return {
+          restaurants: selectedRestaurants,
+          message
+        };
       }
-
+  
       return {
         restaurants,
         message
