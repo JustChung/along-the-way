@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import { Location, Restaurant } from '../../types';
+import { ClockIcon } from '@heroicons/react/24/solid';
 
 // Separate InfoWindow content into its own component
 const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => (
@@ -10,8 +11,8 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
       {typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name}
     </h3>
     
-    {/* Rating and Price */}
-    <div className="flex items-center gap-2 mb-1">
+    {/* Rating, Price, and Detour Time */}
+    <div className="flex items-center gap-2 mb-2">
       <div className="flex items-center">
         <span className="text-sm text-gray-600">{restaurant.rating}</span>
         <span className="text-yellow-400 ml-1">★</span>
@@ -20,6 +21,16 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
         <span className="text-sm text-gray-500">({restaurant.userRatingCount} reviews)</span>
       )}
       <span className="text-sm">{'$'.repeat(restaurant.priceLevel)}</span>
+    </div>
+
+    {/* Detour Time Badge */}
+    <div className="flex items-center gap-2 mb-3 bg-blue-50 p-2 rounded-md">
+      <ClockIcon className="w-4 h-4 text-blue-600" />
+      <span className="text-sm text-blue-700">
+        {restaurant.detourMinutes < 1 
+          ? 'Less than 1 min detour'
+          : `${Math.round(restaurant.detourMinutes)} min detour`}
+      </span>
     </div>
 
     {/* Address */}
@@ -76,6 +87,21 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
     )}
   </div>
 );
+
+// Custom marker colors based on detour time
+const getMarkerIcon = (detourMinutes: number) => {
+  let color;
+  if (detourMinutes <= 5) {
+    color = 'blue';
+  } else if (detourMinutes <= 10) {
+    color = 'purple';
+  } else if (detourMinutes <= 15) {
+    color = 'yellow';
+  } else {
+    color = 'pink';
+  }
+  return `https://maps.google.com/mapfiles/ms/icons/${color}-dot.png`;
+};
 
 interface MapProps {
   center: Location;
@@ -223,7 +249,7 @@ const Map: React.FC<MapProps> = ({
           position={{ lat: restaurant.location.lat, lng: restaurant.location.lng }}
           onClick={() => handleMarkerClick(restaurant)}
           icon={{
-            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            url: getMarkerIcon(restaurant.detourMinutes),
             scaledSize: new window.google.maps.Size(32, 32),
           }}
         />
