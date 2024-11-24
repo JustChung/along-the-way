@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Restaurant } from '../../types';
 
+
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
@@ -36,7 +37,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
-    text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants or tell me where you want to go. For example, try saying 'Find restaurants between Los Angeles and San Diego' or 'I want to drive from NYC to Boston and find highly rated restaurants'.",
+    text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants along your route or plan a new route. For example:\n\n- 'Find restaurants between LA and San Diego'\n- 'What are the highest-rated restaurants on my route?'\n- 'Which restaurants have outdoor seating?'",
     isUser: false,
     timestamp: new Date()
   }]);
@@ -45,6 +46,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatModel = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+  // Existing scroll and effect hooks remain the same
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -53,89 +55,158 @@ const ChatBot: React.FC<ChatBotProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  const generateContext = () => {
+  const getRestaurantContext = () => {
+    if (!restaurants.length) return '';
+    
     const restaurantInfo = restaurants.map(restaurant => ({
       name: typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name,
-      address: typeof restaurant.location.address === 'object' ? restaurant.location.address.text : restaurant.location.address,
       rating: restaurant.rating,
       priceLevel: restaurant.priceLevel,
       detourMinutes: restaurant.detourMinutes,
       facilities: restaurant.facilities,
-      regularOpeningHours: restaurant.regularOpeningHours
+      regularOpeningHours: restaurant.regularOpeningHours?.openNow,
+      address: typeof restaurant.location.address === 'object' ? 
+        restaurant.location.address.text : 
+        restaurant.location.address
     }));
 
-    return `
-      Context: You are a restaurant assistant helping users find restaurants along their route.
-      Current route: ${origin ? `from ${origin}` : ''} ${destination ? `to ${destination}` : ''}
-      
-      Available restaurants along the route:
-      ${JSON.stringify(restaurantInfo, null, 2)}
-
-      When responding:
-      1. If the user asks about finding restaurants between locations, extract:
-         - Origin location
-         - Destination location
-         - Number of stops (if mentioned)
-         - Minimum rating (if mentioned)
-         - Maximum detour time (if mentioned, default to 10 minutes)
-         Return this as JSON wrapped in [ROUTE_REQUEST] tags
-
-      2. For restaurant questions:
-         - Provide specific details about restaurants
-         - Include ratings, price levels, and special features
-         - Mention detour times from the main route
-         - Group similar restaurants together
-    `;
+    return JSON.stringify(restaurantInfo, null, 2);
   };
 
-  const extractRouteRequest = (response: string): RouteRequest | null => {
-    const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
-    if (match) {
-      try {
-        return JSON.parse(match[1]);
-      } catch (e) {
-        console.error('Failed to parse route request:', e);
-      }
+  // Update these parts of your ChatBot component:
+
+const generateResponse = async (userInput: string) => {
+  try {
+    const chat = chatModel.startChat();
+    const restaurantContext = getRestaurantContext();
+    const hasExistingRoute = origin && destination;
+    
+    const prompt = `
+System: You are a restaurant assistant chatbot that can help with two types of requests:
+
+1. Questions about EXISTING restaurants:
+   ${hasExistingRoute ? `- Current route: ${origin} to ${destination}` : ''}
+   ${restaurants.length ? `- ${restaurants.length} restaurants found` : ''}
+   - Use the restaurant data below to answer questions
+   - DO NOT generate [ROUTE_REQUEST] for questions about current restaurants
+
+2. Requests for NEW routes:
+   - When user wants to find restaurants between NEW locations
+   - Must be DIFFERENT from current route
+   - Generate [ROUTE_REQUEST] with new origin and destination
+   Example: If user asks "find restaurants from San Francisco to Seattle", generate:
+   [ROUTE_REQUEST]{"origin":"San Francisco","destination":"Seattle"}[/ROUTE_REQUEST]
+
+Available Restaurant Data:
+${restaurantContext || 'No restaurants available'}
+
+User Query: ${userInput}
+
+Response Rules:
+- For questions about current restaurants: Answer using available data
+- For new route requests: Generate [ROUTE_REQUEST] with new locations
+- Be helpful and informative in all responses
+
+Response:`;
+
+    const result = await chat.sendMessage(prompt);
+    const response = await result.response.text();
+    
+    if (!response) {
+      throw new Error('Empty response received');
     }
-    return null;
-  };
+    
+    return response; // Return the full response including the [ROUTE_REQUEST] if present
+  } catch (error) {
+    console.error('Error generating response:', error);
+    throw error;
+  }
+};
 
-  const generateResponse = async (userInput: string) => {
+const handleSend = async () => {
+  if (!input.trim()) return;
+
+  const userMessage: Message = {
+    text: input,
+    isUser: true,
+    timestamp: new Date(),
+  };
+  
+  setMessages(prev => [...prev, userMessage]);
+  setInput('');
+  setIsLoading(true);
+
+  try {
+    // Check if we're awaiting confirmation
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.extractedData?.needsConfirmation) {
+      handleConfirmation(input, lastMessage.extractedData);
+      setIsLoading(false);
+      return;
+    }
+
+    // Generate new response
+    const response = await generateResponse(input);
+    
+    // Extract route request if present
+    const routeRequest = extractRouteRequest(response);
+
+    if (routeRequest) {
+      // Handle new route request
+      handleRouteRequest(routeRequest);
+    } else {
+      // Handle regular response
+      // Remove any potential [ROUTE_REQUEST] tags from the response
+      const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
+      setMessages(prev => [...prev, {
+        text: cleanResponse || "I understand you're asking about restaurants. What would you like to know?",
+        isUser: false,
+        timestamp: new Date()
+      }]);
+    }
+  } catch (error) {
+    console.error('Error in chat:', error);
+    setMessages(prev => [...prev, {
+      text: "I apologize, but I'm having trouble processing your request. Please try asking your question again.",
+      isUser: false,
+      timestamp: new Date()
+    }]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const extractRouteRequest = (response: string): RouteRequest | null => {
+  const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
+  if (match) {
     try {
-      const chat = chatModel.startChat();
-      const context = generateContext();
-      
-      const result = await chat.sendMessage(`
-        ${context}
-        
-        User message: ${userInput}
-        
-        Instructions:
-        1. If this is a route request, first extract the route information and wrap it in [ROUTE_REQUEST] tags as JSON
-        2. Then provide a natural, conversational response
-        3. If this is about specific restaurants, provide detailed information about them
-      `);
-      
-      const response = await result.response.text();
-      if (!response) {
-        throw new Error('Empty response received');
+      const request = JSON.parse(match[1]);
+      // Only validate that both origin and destination are present
+      if (request.origin && request.destination) {
+        // Return the complete route request object
+        return {
+          origin: request.origin,
+          destination: request.destination,
+          stops: request.stops || null,
+          rating: request.rating || null,
+          maxDetourMinutes: request.maxDetourMinutes || null
+        };
       }
-      
-      return response;
-    } catch (error) {
-      console.error('Error generating response:', error);
-      throw error;
+    } catch (e) {
+      console.error('Failed to parse route request:', e);
     }
-  };
+  }
+  return null;
+};
 
   const handleRouteRequest = (request: RouteRequest) => {
-    // Add confirmation message
     setMessages(prev => [...prev, {
-      text: `I found these route details:\n
-- From: ${request.origin}
-- To: ${request.destination}${request.stops ? `\n- Number of stops: ${request.stops}` : ''}${request.rating ? `\n- Minimum rating: ${request.rating} stars` : ''}${request.maxDetourMinutes ? `\n- Maximum detour: ${request.maxDetourMinutes} minutes` : ''}
+      text: `I'll help you find restaurants between ${request.origin} and ${request.destination}. Here are the details I found:
 
-Would you like me to search for restaurants with these preferences? Please confirm with yes or no.`,
+- Starting point: ${request.origin}
+- Destination: ${request.destination}${request.stops ? `\n- Number of stops: ${request.stops}` : ''}${request.rating ? `\n- Minimum rating: ${request.rating} stars` : ''}${request.maxDetourMinutes ? `\n- Maximum detour: ${request.maxDetourMinutes} minutes` : ''}
+
+Would you like me to search with these preferences? (Please respond with yes or no)`,
       isUser: false,
       timestamp: new Date(),
       extractedData: { ...request, needsConfirmation: true }
@@ -148,7 +219,7 @@ Would you like me to search for restaurants with these preferences? Please confi
     if (isConfirmed && onRouteRequest) {
       onRouteRequest(lastRequest);
       setMessages(prev => [...prev, {
-        text: "Great! I'm searching for restaurants along your route now...",
+        text: "Great! I'll search for restaurants along your route now. Once the results are in, you can ask me specific questions about the restaurants I find.",
         isUser: false,
         timestamp: new Date()
       }]);
@@ -158,57 +229,6 @@ Would you like me to search for restaurants with these preferences? Please confi
         isUser: false,
         timestamp: new Date()
       }]);
-    }
-  };
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    // Add user message
-    const userMessage: Message = {
-      text: input,
-      isUser: true,
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      // Check if we're awaiting confirmation
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.extractedData?.needsConfirmation) {
-        handleConfirmation(input, lastMessage.extractedData);
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate new response
-      const response = await generateResponse(input);
-      
-      // Extract route request if present
-      const routeRequest = extractRouteRequest(response);
-      const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
-
-      if (routeRequest) {
-        handleRouteRequest(routeRequest);
-      } else {
-        setMessages(prev => [...prev, {
-          text: cleanResponse,
-          isUser: false,
-          timestamp: new Date()
-        }]);
-      }
-    } catch (error) {
-      console.error('Error in chat:', error);
-      setMessages(prev => [...prev, {
-        text: "I apologize, but I'm having technical difficulties. Please try asking your question again.",
-        isUser: false,
-        timestamp: new Date()
-      }]);
-    } finally {
-      setIsLoading(false);
     }
   };
 
