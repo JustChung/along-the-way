@@ -1,16 +1,19 @@
-// src/App.tsx
 import React, { useState } from 'react';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
-import { Location, Restaurant} from './types';
+import { Location, Restaurant } from './types';
 import { mapService } from './services/maps';
-import {RouteForm, RouteFormData} from './components/RouteForm/RouteForm';
 import Map from './components/Map/Map';
 import ChatBot from './components/ChatBot/ChatBot';
 import { StickyNavbar } from './components/StickyNavbar/StickyNavbar';
 import { Alert, AlertDescription } from './components/Alert';
-import SlidingPane from "react-sliding-pane";
-import "react-sliding-pane/dist/react-sliding-pane.css";
 import RouteCard from './components/RouteCard/RouteCard';
+
+interface RouteSubmitData {
+  origin: string;
+  destination: string;
+  stops: number;
+  rating: number;
+}
 
 const App: React.FC = () => {
   const { isLoaded, loadError } = useGoogleMaps();
@@ -26,11 +29,7 @@ const App: React.FC = () => {
     address: 'Los Angeles, CA'
   });
 
-  // Sidebar open state
-  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
-
-  const handleRouteSubmit = async (data: RouteFormData) => {
-    const { origin, destination, preferences } = data;
+  const handleRouteSubmit = async (data: RouteSubmitData) => {
     setIsLoading(true);
     setError(null);
     setRestaurants([]);
@@ -38,17 +37,15 @@ const App: React.FC = () => {
     try {
       // Geocode addresses
       const [originLocation, destLocation] = await Promise.all([
-        mapService.geocodeAddress(origin),
-        mapService.geocodeAddress(destination)
+        mapService.geocodeAddress(data.origin),
+        mapService.geocodeAddress(data.destination)
       ]);
   
       setOrigin(originLocation);
       setDestination(destLocation);
   
-      // Get route
-      const routeData = await await mapService.getDirectionsJS(originLocation, destLocation);;
+      const routeData = await mapService.getDirectionsJS(originLocation, destLocation);
   
-      // Update map center to show the entire route
       if (routeData.routes[0]?.bounds) {
         const bounds = routeData.routes[0].bounds;
         setMapCenter({
@@ -58,12 +55,19 @@ const App: React.FC = () => {
         });
       }
   
-      // Search for restaurants along the route
-      const foundRestaurants = await mapService.getRestaurantsAlongRoute(routeData, originLocation);
-      setRestaurants(foundRestaurants);
+      const result = await mapService.getRestaurantsAlongRoute(
+        routeData, 
+        originLocation,
+        { maxStops: data.stops, minRating: data.rating }
+      );
+      
+      setRestaurants(result.restaurants);
   
-      if (foundRestaurants.length === 0) {
+      if (result.restaurants.length === 0) {
         setError('No restaurants found matching your criteria. Try adjusting your preferences.');
+      } else if (result.message) {
+        // Show informative message instead of error
+        setError(result.message);
       }
     } catch (error) {
       console.error('Error processing route:', error);
@@ -76,7 +80,6 @@ const App: React.FC = () => {
   const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
   };
-    
 
   if (loadError) {
     return (
@@ -99,57 +102,55 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 static">
-      <div className="absolute w-full">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Navbar */}
+      <div className="absolute w-full z-10">
         <StickyNavbar/>
       </div>
+
+      {/* Map */}
       <div className="h-screen w-screen">
-          <Map
-            center={mapCenter}
-            zoom={12}
-            restaurants={restaurants}
-            origin={origin}
-            destination={destination}
-            onRestaurantSelect={handleRestaurantSelect}
-          />
+        <Map
+          center={mapCenter}
+          zoom={12}
+          restaurants={restaurants}
+          origin={origin}
+          destination={destination}
+          onRestaurantSelect={handleRestaurantSelect}
+          selectedRestaurant={selectedRestaurant}
+        />
       </div>
-      <div className="z-1 mt-16 ml-4 absolute top-0">
-        <RouteCard source={origin?.address} destination={destination?.address} onSelect={() => setIsPanelOpen(true)}/>
-        {/* List */}
-      </div>
-      {/* Documentation: https://www.npmjs.com/package/react-sliding-pane */}
-      <SlidingPane
-        isOpen={isPanelOpen}
-        overlayClassName="z-[2]"
-        title={<span className="text-2xl font-bold text-gray-900">Route Planner</span>}
-        from="left"
-        width="30%"
-        onRequestClose={() => setIsPanelOpen(false)}
-      >
-        <div className="lg:col-span-1 space-y-6">
-          <RouteForm onSubmit={handleRouteSubmit} />
-          {isLoading && (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Searching for restaurants...</p>
+
+      {/* Route Card and Status Messages */}
+      <div className="absolute top-20 left-4 z-20 space-y-4">
+        <RouteCard onSubmit={handleRouteSubmit} />
+        
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="bg-white rounded-lg shadow-lg p-4 opacity-95">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="text-gray-600">Searching for restaurants...</span>
             </div>
-          )}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {/* <RestaurantList 
-            restaurants={restaurants} 
-            onSelect={handleRestaurantSelect}
-          /> */}
-          <ChatBot 
-            restaurants={restaurants}
-            origin={origin?.address}
-            destination={destination?.address}
-          />
-        </div>
-      </SlidingPane>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      {/* ChatBot */}
+      <div className="fixed bottom-4 right-4 z-20">
+        <ChatBot 
+          restaurants={restaurants}
+          origin={origin?.address}
+          destination={destination?.address}
+        />
+      </div>
     </div>
   );
 };
