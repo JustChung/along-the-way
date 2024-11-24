@@ -44,10 +44,8 @@ const App: React.FC = () => {
       setOrigin(originLocation);
       setDestination(destLocation);
   
-      // Get route
       const routeData = await mapService.getDirectionsJS(originLocation, destLocation);
   
-      // Update map center to show the entire route
       if (routeData.routes[0]?.bounds) {
         const bounds = routeData.routes[0].bounds;
         setMapCenter({
@@ -57,22 +55,19 @@ const App: React.FC = () => {
         });
       }
   
-      // Search for restaurants along the route
-      const foundRestaurants = await mapService.getRestaurantsAlongRoute(
+      const result = await mapService.getRestaurantsAlongRoute(
         routeData, 
         originLocation,
-        { maxStops: data.stops }
+        { maxStops: data.stops, minRating: data.rating }
       );
       
-      // Filter restaurants based on rating if specified
-      const filteredRestaurants = data.rating > 0 
-        ? foundRestaurants.filter(restaurant => (restaurant.rating || 0) >= data.rating)
-        : foundRestaurants;
-      
-      setRestaurants(filteredRestaurants);
+      setRestaurants(result.restaurants);
   
-      if (filteredRestaurants.length === 0) {
+      if (result.restaurants.length === 0) {
         setError('No restaurants found matching your criteria. Try adjusting your preferences.');
+      } else if (result.message) {
+        // Show informative message instead of error
+        setError(result.message);
       }
     } catch (error) {
       console.error('Error processing route:', error);

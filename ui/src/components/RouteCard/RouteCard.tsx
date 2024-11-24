@@ -7,7 +7,7 @@ interface RouteCardProps {
   onSubmit: (data: {
     origin: string;
     destination: string;
-    stops: number;
+    stops: number | null;
     rating: number;
   }) => void;
 }
@@ -16,7 +16,7 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [showOptions, setShowOptions] = useState(false);
-  const [stops, setStops] = useState<number>(0);
+  const [stops, setStops] = useState<number | null>(null);
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
@@ -112,14 +112,18 @@ const RouteCard: React.FC<RouteCardProps> = ({ onSubmit }) => {
               {/* Number of Stops */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Number of stops
+                  Number of stops (0 for no limit)
                 </label>
                 <input
                   type="number"
                   min="0"
-                  value={stops}
-                  onChange={(e) => setStops(parseInt(e.target.value) || 0)}
+                  value={stops === null ? "" : stops} // Handle null in the input
+                  onChange={(e) => {
+                    const value = e.target.value === "" ? null : parseInt(e.target.value);
+                    setStops(value);
+                  }}
                   className="w-full p-2 border-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="No limit"
                 />
               </div>
 

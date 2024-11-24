@@ -1,6 +1,16 @@
 // src/services/maps.ts
 import axios from 'axios';
-import { Location, RoutePreferences } from '../types';
+import { Location, Restaurant, RoutePreferences } from '../types';
+
+interface SearchOptions {
+  maxStops: number | null;
+  minRating: number;
+}
+
+interface RestaurantSearchResult {
+  restaurants: Restaurant[];
+  message?: string;
+}
 
 class MapService {
   private readonly apiKey: string;
@@ -45,7 +55,11 @@ class MapService {
   }
 
   // Google Maps HTTP API methods
-  async getRestaurantsAlongRoute(routeData: google.maps.DirectionsResult, origin: Location) {
+  async getRestaurantsAlongRoute(
+    routeData: google.maps.DirectionsResult, 
+    origin: Location,
+    options: SearchOptions
+  ): Promise<RestaurantSearchResult> {
     try {
       const response = await axios.post(
         'https://places.googleapis.com/v1/places:searchText', 
@@ -66,7 +80,7 @@ class MapService {
         }
       );
 
-      return response.data.places.map((place: any) => ({
+      let restaurants = response.data.places.map((place: any) => ({
         id: place.place_id,
         name: place.displayName,
         location: {
@@ -78,9 +92,41 @@ class MapService {
         priceLevel: place.priceLevel || 0,
         photos: place.photos ? place.photos : [],
         reviews: place.reviews,
+        distanceFromStart: place.distanceMeters || 0
       }));
+
+      // Sort restaurants by distance from start of route
+      restaurants = restaurants.sort((a, b) => 
+        a.distanceFromStart - b.distanceFromStart
+      );
+
+      // Filter by rating if specified
+      if (options.minRating > 0) {
+        restaurants = restaurants.filter(restaurant => 
+          restaurant.rating >= options.minRating
+        );
+      }
+
+      let message: string | undefined;
+
+      // Handle stops limit and messaging
+      if (options.maxStops && options.maxStops > 0) {
+        const totalAvailable = restaurants.length;
+        if (totalAvailable < options.maxStops) {
+          message = `You requested ${options.maxStops} stops, but only ${totalAvailable} restaurants were found along your route.`;
+        } else if (totalAvailable > options.maxStops) {
+          message = `Showing ${options.maxStops} of ${totalAvailable} available restaurants along your route.`;
+          restaurants = restaurants.slice(0, options.maxStops);
+        }
+      }
+
+      return {
+        restaurants,
+        message
+      };
     } catch (error) {
-      throw new Error(`Failed to fetch restaurants: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch restaurants: ${errorMessage}`);
     }
   }
 
