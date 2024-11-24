@@ -1,6 +1,81 @@
+// src/components/Map/Map.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import { Location, Restaurant } from '../../types';
+
+// Separate InfoWindow content into its own component
+const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => (
+  <div className="p-2 max-w-xs">
+    <h3 className="font-bold text-lg mb-1">
+      {typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name}
+    </h3>
+    
+    {/* Rating and Price */}
+    <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center">
+        <span className="text-sm text-gray-600">{restaurant.rating}</span>
+        <span className="text-yellow-400 ml-1">★</span>
+      </div>
+      {restaurant.userRatingCount && (
+        <span className="text-sm text-gray-500">({restaurant.userRatingCount} reviews)</span>
+      )}
+      <span className="text-sm">{'$'.repeat(restaurant.priceLevel)}</span>
+    </div>
+
+    {/* Address */}
+    {restaurant.location.formattedAddress && (
+      <div className="text-sm text-gray-600 mb-2">
+        {restaurant.location.formattedAddress}
+      </div>
+    )}
+
+    {/* Opening Hours */}
+    {restaurant.regularOpeningHours && (
+      <div className="mb-2">
+        <div className="text-sm font-semibold mb-1">
+          {restaurant.regularOpeningHours.openNow ? (
+            <span className="text-green-600">Open Now</span>
+          ) : (
+            <span className="text-red-600">Closed</span>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Facilities */}
+    {restaurant.facilities && (
+      <div className="flex flex-wrap gap-1 mb-2">
+        {restaurant.facilities.outdoorSeating && (
+          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Outdoor Seating</span>
+        )}
+        {restaurant.facilities.reservable && (
+          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Reservations</span>
+        )}
+        {restaurant.facilities.wheelchairAccessible && (
+          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Wheelchair Accessible</span>
+        )}
+      </div>
+    )}
+
+    {/* Contact */}
+    {(restaurant.phoneNumber || restaurant.websiteUri) && (
+      <div className="text-sm">
+        {restaurant.phoneNumber && (
+          <div className="text-blue-600 mb-1">
+            <a href={`tel:${restaurant.phoneNumber}`}>{restaurant.phoneNumber}</a>
+          </div>
+        )}
+        {restaurant.websiteUri && (
+          <div className="text-blue-600 truncate">
+            <a href={restaurant.websiteUri} target="_blank" rel="noopener noreferrer">
+              Visit Website
+            </a>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);
 
 interface MapProps {
   center: Location;
@@ -9,21 +84,34 @@ interface MapProps {
   origin?: Location | null;
   destination?: Location | null;
   onRestaurantSelect?: (restaurant: Restaurant) => void;
+  selectedRestaurant?: Restaurant | null;
 }
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const libraries = ['places'] as ('places')[];
-
-const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destination, onRestaurantSelect }) => {
+const Map: React.FC<MapProps> = ({
+  center,
+  zoom,
+  restaurants,
+  origin,
+  destination,
+  onRestaurantSelect,
+  selectedRestaurant: externalSelectedRestaurant
+}) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const libRef = React.useRef(libraries);
+  const libRef = React.useRef(['places'] as const);
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: API_KEY,
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries: libRef.current,
   });
+
+  // Sync external and internal selected restaurant state
+  useEffect(() => {
+    if (externalSelectedRestaurant) {
+      setSelectedRestaurant(externalSelectedRestaurant);
+    }
+  }, [externalSelectedRestaurant]);
 
   const mapContainerStyle = {
     width: '100%',
@@ -89,9 +177,9 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         fullscreenControl: false,
       }}
     >
+      {/* Origin Marker */}
       {origin && (
         <Marker
-          key="origin-marker"
           position={{ lat: origin.lat, lng: origin.lng }}
           icon={{
             url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
@@ -101,9 +189,9 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         />
       )}
 
+      {/* Destination Marker */}
       {destination && (
         <Marker
-          key="destination-marker"
           position={{ lat: destination.lat, lng: destination.lng }}
           icon={{
             url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
@@ -113,9 +201,9 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         />
       )}
 
+      {/* Directions */}
       {directions && (
         <DirectionsRenderer
-          key="directions-renderer"
           directions={directions}
           options={{
             suppressMarkers: true,
@@ -128,6 +216,7 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         />
       )}
 
+      {/* Restaurant Markers */}
       {restaurants.map((restaurant, index) => (
         <Marker
           key={restaurant.id || `restaurant-${index}`}
@@ -140,37 +229,18 @@ const Map: React.FC<MapProps> = ({ center, zoom, restaurants, origin, destinatio
         />
       ))}
 
-    {selectedRestaurant && (
-      <InfoWindow
-        key={`info-${selectedRestaurant.id}`}
-        position={{
-          lat: selectedRestaurant.location.lat,
-          lng: selectedRestaurant.location.lng,
-        }}
-        onCloseClick={() => setSelectedRestaurant(null)}
-      >
-        <div className="p-2 max-w-xs">
-          <h3 className="font-bold text-lg mb-1">
-            {typeof selectedRestaurant.name === 'object' && 'text' in selectedRestaurant.name
-              ? selectedRestaurant.name.text
-              : selectedRestaurant.name}
-          </h3>
-          <div className="text-sm text-gray-600 mb-1">
-            Rating: {selectedRestaurant.rating} ★
-          </div>
-          <div className="text-sm">
-            {'$'.repeat(selectedRestaurant.priceLevel)}
-          </div>
-          {selectedRestaurant.location.address && (
-            <div className="text-sm text-gray-600 mt-1">
-              {typeof selectedRestaurant.location.address === 'object' && 'text' in selectedRestaurant.location.address
-                ? selectedRestaurant.location.address.text
-                : selectedRestaurant.location.address}
-            </div>
-          )}
-        </div>
-      </InfoWindow>
-    )}
+      {/* InfoWindow */}
+      {selectedRestaurant && (
+        <InfoWindow
+          position={{
+            lat: selectedRestaurant.location.lat,
+            lng: selectedRestaurant.location.lng,
+          }}
+          onCloseClick={() => setSelectedRestaurant(null)}
+        >
+          <InfoWindowContent restaurant={selectedRestaurant} />
+        </InfoWindow>
+      )}
     </GoogleMap>
   );
 };
