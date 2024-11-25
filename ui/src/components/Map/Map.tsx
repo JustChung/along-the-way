@@ -1,94 +1,198 @@
-// src/components/Map/Map.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import { Location, Restaurant } from '../../types';
 import { ClockIcon } from '@heroicons/react/24/solid';
+import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/solid';
 
-// Separate InfoWindow content into its own component
-const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => (
-  <div className="p-2 max-w-xs">
-    <h3 className="font-bold text-lg mb-1">
-      {typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name}
-    </h3>
-    
-    {/* Rating, Price, and Detour Time */}
-    <div className="flex items-center gap-2 mb-2">
-      <div className="flex items-center">
-        <span className="text-sm text-gray-600">{restaurant.rating}</span>
-        <span className="text-yellow-400 ml-1">★</span>
+// Helper function to safely get text content
+const getTextContent = (text: string | { text: string } | any): string => {
+  if (typeof text === 'string') return text;
+  if (text && typeof text === 'object' && 'text' in text) return text.text;
+  return '';
+};
+
+const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => {
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageError, setImageError] = useState(false);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      if (restaurant.photos?.[0]?.name) {
+        setIsLoadingImage(true);
+        try {
+          const photoReference = restaurant.photos[0].name.split('/').pop();
+          const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+          setImageUrl(photoUrl);
+          setImageError(false);
+        } catch (error) {
+          console.error('Error loading restaurant image:', error);
+          setImageError(true);
+        } finally {
+          setIsLoadingImage(false);
+        }
+      }
+    };
+
+    loadImage();
+    setShowReviews(false);
+  }, [restaurant]);
+
+  const handleToggleReviews = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowReviews(prev => !prev);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  // Log reviews data to help debug
+  console.log('Reviews:', restaurant.reviews);
+
+  return (
+    <div className="p-2 max-w-xs" onClick={handleContainerClick}>
+      {isLoadingImage ? (
+        <div className="mb-3 w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      ) : !imageError && imageUrl ? (
+        <div className="mb-3 w-full">
+          <img
+            src={imageUrl}
+            alt={`${restaurant.name} exterior`}
+            className="w-full h-48 object-cover rounded-lg"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      ) : null}
+
+      <h3 className="font-bold text-lg mb-1">
+        {typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name}
+      </h3>
+      
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center">
+          <span className="text-sm text-gray-600">{restaurant.rating}</span>
+          <span className="text-yellow-400 ml-1">★</span>
+        </div>
+        {restaurant.userRatingCount && (
+          <span className="text-sm text-gray-500">({restaurant.userRatingCount} reviews)</span>
+        )}
+        <span className="text-sm">{'$'.repeat(restaurant.priceLevel)}</span>
       </div>
-      {restaurant.userRatingCount && (
-        <span className="text-sm text-gray-500">({restaurant.userRatingCount} reviews)</span>
+
+      <div className="flex items-center gap-2 mb-3 bg-blue-50 p-2 rounded-md">
+        <ClockIcon className="w-4 h-4 text-blue-600" />
+        <span className="text-sm text-blue-700">
+          {restaurant.detourMinutes < 1 
+            ? 'Less than 1 min detour'
+            : `${Math.round(restaurant.detourMinutes)} min detour`}
+        </span>
+      </div>
+
+      {restaurant.location.formattedAddress && (
+        <div className="text-sm text-gray-600 mb-2">
+          {restaurant.location.formattedAddress}
+        </div>
       )}
-      <span className="text-sm">{'$'.repeat(restaurant.priceLevel)}</span>
-    </div>
 
-    {/* Detour Time Badge */}
-    <div className="flex items-center gap-2 mb-3 bg-blue-50 p-2 rounded-md">
-      <ClockIcon className="w-4 h-4 text-blue-600" />
-      <span className="text-sm text-blue-700">
-        {restaurant.detourMinutes < 1 
-          ? 'Less than 1 min detour'
-          : `${Math.round(restaurant.detourMinutes)} min detour`}
-      </span>
-    </div>
+      {restaurant.regularOpeningHours && (
+        <div className="mb-2">
+          <div className="text-sm font-semibold mb-1">
+            {restaurant.regularOpeningHours.openNow ? (
+              <span className="text-green-600">Open Now</span>
+            ) : (
+              <span className="text-red-600">Closed</span>
+            )}
+          </div>
+        </div>
+      )}
 
-    {/* Address */}
-    {restaurant.location.formattedAddress && (
-      <div className="text-sm text-gray-600 mb-2">
-        {restaurant.location.formattedAddress}
-      </div>
-    )}
-
-    {/* Opening Hours */}
-    {restaurant.regularOpeningHours && (
-      <div className="mb-2">
-        <div className="text-sm font-semibold mb-1">
-          {restaurant.regularOpeningHours.openNow ? (
-            <span className="text-green-600">Open Now</span>
-          ) : (
-            <span className="text-red-600">Closed</span>
+      {restaurant.facilities && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {restaurant.facilities.outdoorSeating && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Outdoor Seating</span>
+          )}
+          {restaurant.facilities.reservable && (
+            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Reservations</span>
+          )}
+          {restaurant.facilities.wheelchairAccessible && (
+            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Wheelchair Accessible</span>
           )}
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Facilities */}
-    {restaurant.facilities && (
-      <div className="flex flex-wrap gap-1 mb-2">
-        {restaurant.facilities.outdoorSeating && (
-          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Outdoor Seating</span>
-        )}
-        {restaurant.facilities.reservable && (
-          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Reservations</span>
-        )}
-        {restaurant.facilities.wheelchairAccessible && (
-          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Wheelchair Accessible</span>
-        )}
-      </div>
-    )}
+      {/* Reviews Button */}
+      {restaurant.reviews && restaurant.reviews.length > 0 && (
+        <button
+          onClick={handleToggleReviews}
+          className="w-full mb-3 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded transition-colors"
+        >
+          <ChatBubbleLeftEllipsisIcon className="w-4 h-4" />
+          {showReviews ? 'Hide Reviews' : 'Show Reviews'}
+        </button>
+      )}
 
-    {/* Contact */}
-    {(restaurant.phoneNumber || restaurant.websiteUri) && (
-      <div className="text-sm">
-        {restaurant.phoneNumber && (
-          <div className="text-blue-600 mb-1">
-            <a href={`tel:${restaurant.phoneNumber}`}>{restaurant.phoneNumber}</a>
-          </div>
-        )}
-        {restaurant.websiteUri && (
-          <div className="text-blue-600 truncate">
-            <a href={restaurant.websiteUri} target="_blank" rel="noopener noreferrer">
-              Visit Website
-            </a>
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-);
+      {/* Reviews Section */}
+      {showReviews && restaurant.reviews && (
+        <div className="mt-2 space-y-3 max-h-48 overflow-y-auto">
+          {restaurant.reviews.map((review, index) => (
+            <div key={index} className="bg-gray-50 p-2 rounded">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-sm">
+                  {review.authorAttribution?.displayName || 'Anonymous'}
+                </span>
+                <div className="flex items-center">
+                  <span className="text-sm text-yellow-600">{review.rating}</span>
+                  <span className="text-yellow-400 ml-1">★</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">{getTextContent(review.text)}</p>
+              <span className="text-xs text-gray-400 block mt-1">
+                {review.relativePublishTimeDescription}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
-// Custom marker colors based on detour time
+      {(restaurant.phoneNumber || restaurant.websiteUri) && (
+        <div className="text-sm mt-3">
+          {restaurant.phoneNumber && (
+            <div className="text-blue-600 mb-1">
+              <a 
+                href={`tel:${restaurant.phoneNumber}`}
+                onClick={handleLinkClick}
+              >
+                {restaurant.phoneNumber}
+              </a>
+            </div>
+          )}
+          {restaurant.websiteUri && (
+            <div className="text-blue-600 truncate">
+              <a 
+                href={restaurant.websiteUri} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={handleLinkClick}
+              >
+                Visit Website
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const getMarkerIcon = (detourMinutes: number) => {
   let color;
   if (detourMinutes <= 5) {
@@ -132,7 +236,6 @@ const Map: React.FC<MapProps> = ({
     libraries: libRef.current,
   });
 
-  // Sync external and internal selected restaurant state
   useEffect(() => {
     if (externalSelectedRestaurant) {
       setSelectedRestaurant(externalSelectedRestaurant);
@@ -152,7 +255,6 @@ const Map: React.FC<MapProps> = ({
     setMap(null);
   }, []);
 
-  // Handle directions
   useEffect(() => {
     if (!isLoaded || !origin || !destination || !window.google) return;
 
@@ -203,7 +305,6 @@ const Map: React.FC<MapProps> = ({
         fullscreenControl: false,
       }}
     >
-      {/* Origin Marker */}
       {origin && (
         <Marker
           position={{ lat: origin.lat, lng: origin.lng }}
@@ -215,7 +316,6 @@ const Map: React.FC<MapProps> = ({
         />
       )}
 
-      {/* Destination Marker */}
       {destination && (
         <Marker
           position={{ lat: destination.lat, lng: destination.lng }}
@@ -227,7 +327,6 @@ const Map: React.FC<MapProps> = ({
         />
       )}
 
-      {/* Directions */}
       {directions && (
         <DirectionsRenderer
           directions={directions}
@@ -242,7 +341,6 @@ const Map: React.FC<MapProps> = ({
         />
       )}
 
-      {/* Restaurant Markers */}
       {restaurants.map((restaurant, index) => (
         <Marker
           key={restaurant.id || `restaurant-${index}`}
@@ -255,7 +353,6 @@ const Map: React.FC<MapProps> = ({
         />
       ))}
 
-      {/* InfoWindow */}
       {selectedRestaurant && (
         <InfoWindow
           position={{
