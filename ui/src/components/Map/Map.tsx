@@ -3,8 +3,8 @@ import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from
 import { Location, Restaurant } from '../../types';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/solid';
+import { StarIcon } from '@heroicons/react/24/solid';
 
-// Helper function to safely get text content
 const getTextContent = (text: string | { text: string } | any): string => {
   if (typeof text === 'string') return text;
   if (text && typeof text === 'object' && 'text' in text) return text.text;
@@ -53,8 +53,11 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
     e.stopPropagation();
   };
 
-  // Log reviews data to help debug
-  console.log('Reviews:', restaurant.reviews);
+  const getGoogleReviewUrl = () => {
+    const placeName = encodeURIComponent(typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name);
+    const placeLocation = encodeURIComponent(`${restaurant.location.lat},${restaurant.location.lng}`);
+    return `https://search.google.com/local/writereview?placeid=${restaurant.id}`;
+  };
 
   return (
     <div className="p-2 max-w-xs" onClick={handleContainerClick}>
@@ -97,6 +100,17 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
         </span>
       </div>
 
+      <a
+        href={getGoogleReviewUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleLinkClick}
+        className="w-full mb-3 flex items-center justify-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded transition-colors"
+      >
+        <StarIcon className="w-4 h-4 text-yellow-400" />
+        Rate on Google
+      </a>
+
       {restaurant.location.formattedAddress && (
         <div className="text-sm text-gray-600 mb-2">
           {restaurant.location.formattedAddress}
@@ -129,7 +143,6 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
         </div>
       )}
 
-      {/* Reviews Button */}
       {restaurant.reviews && restaurant.reviews.length > 0 && (
         <button
           onClick={handleToggleReviews}
@@ -140,7 +153,6 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
         </button>
       )}
 
-      {/* Reviews Section */}
       {showReviews && restaurant.reviews && (
         <div className="mt-2 space-y-3 max-h-48 overflow-y-auto">
           {restaurant.reviews.map((review, index) => (
