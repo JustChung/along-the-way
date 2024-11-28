@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Location, Restaurant } from '../types';
 
 interface SearchOptions {
+  search: string | null;
   maxStops: number | null;
   minRating: number;
   maxDetourMinutes: number;
@@ -189,7 +190,7 @@ async getRestaurantsAlongRoute(
     const response = await axios.post(
       `${this.placesApiBaseUrl}:searchText`,
       {
-        textQuery: "restaurants",
+        textQuery: options.search,
         searchAlongRouteParameters: {
           polyline: {
             encodedPolyline: routeData.routes[0].overview_polyline
