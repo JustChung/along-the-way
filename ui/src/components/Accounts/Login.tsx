@@ -2,12 +2,28 @@ import { useState } from "react";
 import { Typography, Input, Button } from "@material-tailwind/react";
 import { EyeSlashIcon, EyeIcon } from "@heroicons/react/24/solid";
 import { useNavigate } from "react-router-dom";
+import { auth } from "../../database/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export function Login() {
   const [passwordShown, setPasswordShown] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const togglePasswordVisibility = () => setPasswordShown((cur) => !cur);
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/"); // Redirect to the home page after successful login
+    } catch (error) {
+      setError("Error logging in. Please check your credentials.");
+    }
+  };
 
   return (
     <section className="grid text-center h-screen items-center p-8">
@@ -18,7 +34,10 @@ export function Login() {
         <Typography className="mb-16 text-gray-600 font-normal text-[18px]">
           Enter your details to sign in
         </Typography>
-        <form className="mx-auto max-w-[24rem] text-left">
+        <form
+          onSubmit={handleLogin}
+          className="mx-auto max-w-[24rem] text-left"
+        >
           <div className="mb-6">
             <label htmlFor="email">
               <Typography
@@ -36,9 +55,8 @@ export function Login() {
               name="email"
               placeholder="name@mail.com"
               className="w-full placeholder:opacity-100 focus:border-t-primary border-t-blue-gray-200"
-              labelProps={{
-                className: "hidden",
-              }}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)} // controlled input
             />
           </div>
           <div className="mb-6">
@@ -53,9 +71,6 @@ export function Login() {
             <Input
               size="lg"
               placeholder="********"
-              labelProps={{
-                className: "hidden",
-              }}
               className="w-full placeholder:opacity-100 focus:border-t-primary border-t-blue-gray-200"
               type={passwordShown ? "text" : "password"}
               icon={
@@ -67,9 +82,18 @@ export function Login() {
                   )}
                 </i>
               }
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} // controlled input
             />
           </div>
-          <Button color="gray" size="lg" className="mt-6" fullWidth>
+          {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+          <Button
+            type="submit"
+            color="gray"
+            size="lg"
+            className="mt-6"
+            fullWidth
+          >
             Sign in
           </Button>
           <div className="!mt-4 flex justify-center">

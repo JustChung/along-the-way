@@ -2,13 +2,28 @@ import { useState } from "react";
 import { Typography, Input, Button } from "@material-tailwind/react";
 import { EyeSlashIcon, EyeIcon } from "@heroicons/react/24/solid";
 import { useNavigate } from "react-router-dom";
-import { StickyNavbar } from "./components/StickyNavbar/StickyNavbar";
+import { auth } from "../../database/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 export function Signup() {
   const [passwordShown, setPasswordShown] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const togglePasswordVisibility = () => setPasswordShown((cur) => !cur);
+
+  const handleSignup = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      navigate("/"); // Redirect to the home page after signup
+    } catch (error) {
+      setError("Error signing up. Please try again.");
+    }
+  };
 
   return (
     <section className="grid text-center h-screen items-center p-8">
@@ -19,29 +34,10 @@ export function Signup() {
         <Typography className="mb-16 text-gray-600 font-normal text-[18px]">
           Enter your details to create a new account
         </Typography>
-        <form className="mx-auto max-w-[24rem] text-left">
-          <div className="mb-6">
-            <label htmlFor="name">
-              <Typography
-                variant="small"
-                className="mb-2 block font-medium text-gray-900"
-              >
-                Your Name
-              </Typography>
-            </label>
-            <Input
-              id="name"
-              color="gray"
-              size="lg"
-              type="text"
-              name="name"
-              placeholder="John Doe"
-              className="w-full placeholder:opacity-100 focus:border-t-primary border-t-blue-gray-200"
-              labelProps={{
-                className: "hidden",
-              }}
-            />
-          </div>
+        <form
+          onSubmit={handleSignup}
+          className="mx-auto max-w-[24rem] text-left"
+        >
           <div className="mb-6">
             <label htmlFor="email">
               <Typography
@@ -59,9 +55,8 @@ export function Signup() {
               name="email"
               placeholder="name@mail.com"
               className="w-full placeholder:opacity-100 focus:border-t-primary border-t-blue-gray-200"
-              labelProps={{
-                className: "hidden",
-              }}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)} // controlled input
             />
           </div>
           <div className="mb-6">
@@ -76,9 +71,6 @@ export function Signup() {
             <Input
               size="lg"
               placeholder="********"
-              labelProps={{
-                className: "hidden",
-              }}
               className="w-full placeholder:opacity-100 focus:border-t-primary border-t-blue-gray-200"
               type={passwordShown ? "text" : "password"}
               icon={
@@ -90,9 +82,18 @@ export function Signup() {
                   )}
                 </i>
               }
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} // controlled input
             />
           </div>
-          <Button color="gray" size="lg" className="mt-6" fullWidth>
+          {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+          <Button
+            type="submit"
+            color="gray"
+            size="lg"
+            className="mt-6"
+            fullWidth
+          >
             Sign up
           </Button>
           <div className="!mt-4 flex justify-center">
