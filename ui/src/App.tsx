@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
 import { Location, Restaurant } from './types';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {Login} from "./components/Accounts/Login";
+import {Signup} from "./components/Accounts/Signup";
 import { mapService } from './services/maps';
 import Map from './components/Map/Map';
 import ChatBot from './components/ChatBot/ChatBot';
@@ -142,62 +145,72 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      {/* Navbar */}
-      <div className="absolute w-full z-10">
-        <StickyNavbar/>
-      </div>
+<Router>
+  {/* Navbar is ouside Routes to appear on all pages */}
+  <div className="absolute w-full z-10">
+    <StickyNavbar />
+  </div>
 
-      {/* Map */}
-      <div className="h-screen w-screen">
-        <Map
-          center={mapCenter}
-          zoom={12}
-          restaurants={restaurants}
-          origin={origin}
-          destination={destination}
-          onRestaurantSelect={handleRestaurantSelect}
-          selectedRestaurant={selectedRestaurant}
-        />
-      </div>
-
-      {/* Route Card and Status Messages */}
-      <div className="absolute top-20 left-4 z-20 space-y-4">
-        {/* Add ref to RouteCard */}
-        <RouteCard 
-          ref={routeCardRef}
-          onSubmit={handleRouteSubmit} 
-        />
-        
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="bg-white rounded-lg shadow-lg p-4 opacity-95">
-            <div className="flex items-center justify-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-gray-600">Searching for restaurants...</span>
-            </div>
+  <Routes>
+    <Route
+      path="/"
+      // This is the main path/route
+      element={
+        <div className="min-h-screen bg-gray-50 relative">
+          {/* Map and other components on the main page */}
+          <div className="h-screen w-screen">
+            <Map
+              center={mapCenter}
+              zoom={12}
+              restaurants={restaurants}
+              origin={origin}
+              destination={destination}
+              onRestaurantSelect={handleRestaurantSelect}
+              selectedRestaurant={selectedRestaurant}
+            />
           </div>
-        )}
 
-        {/* Error Message */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-      </div>
+          {/* Route Card and Status Messages */}
+          <div className="absolute top-20 left-4 z-20 space-y-4">
+            <RouteCard ref={routeCardRef} onSubmit={handleRouteSubmit} />
 
-      {/* ChatBot */}
-      <div className="fixed bottom-4 right-4 z-20">
-        <ChatBot 
-          restaurants={restaurants}
-          origin={origin?.address}
-          destination={destination?.address}
-          onRouteRequest={handleChatBotRouteRequest}
-        />
-      </div>
-    </div>
-  );
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="bg-white rounded-lg shadow-lg p-4 opacity-95">
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-gray-600">Searching for restaurants...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* ChatBot */}
+          <div className="fixed bottom-4 right-4 z-20">
+            <ChatBot
+              restaurants={restaurants}
+              origin={origin?.address}
+              destination={destination?.address}
+              onRouteRequest={handleChatBotRouteRequest}
+            />
+          </div>
+        </div>
+      }
+    />
+    {/* Routes to other pages in the nav bar */}
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<Signup />} />
+  </Routes>
+</Router>
+
+);
 };
 
 export default App;
