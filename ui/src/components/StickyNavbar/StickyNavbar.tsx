@@ -1,6 +1,11 @@
-import React from 'react';
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Navbar, Typography, Button, IconButton } from "@material-tailwind/react";
+import {
+  Navbar,
+  Typography,
+  Button,
+  IconButton,
+} from "@material-tailwind/react";
 
 export function StickyNavbar() {
   const [openNav, setOpenNav] = React.useState(false);
@@ -15,17 +20,45 @@ export function StickyNavbar() {
 
   const navList = (
     <ul className="mt-2 mb-4 flex flex-col gap-2 lg:mb-0 lg:mt-0 lg:flex-row lg:items-center lg:gap-6">
-      <Typography as="li" variant="small" color="blue-gray" className="p-1 font-normal">
-        <a href="#" className="flex items-center">Pages</a>
+      <Typography
+        as="li"
+        variant="small"
+        color="blue-gray"
+        className="p-1 font-normal"
+      >
+        <a href="#" className="flex items-center">
+          Pages
+        </a>
       </Typography>
-      <Typography as="li" variant="small" color="blue-gray" className="p-1 font-normal">
-        <a href="#" className="flex items-center">Account</a>
+      <Typography
+        as="li"
+        variant="small"
+        color="blue-gray"
+        className="p-1 font-normal"
+      >
+        <a href="#" className="flex items-center">
+          Account
+        </a>
       </Typography>
-      <Typography as="li" variant="small" color="blue-gray" className="p-1 font-normal">
-        <a href="#" className="flex items-center">Blocks</a>
+      <Typography
+        as="li"
+        variant="small"
+        color="blue-gray"
+        className="p-1 font-normal"
+      >
+        <a href="#" className="flex items-center">
+          Blocks
+        </a>
       </Typography>
-      <Typography as="li" variant="small" color="blue-gray" className="p-1 font-normal">
-        <a href="#" className="flex items-center">Docs</a>
+      <Typography
+        as="li"
+        variant="small"
+        color="blue-gray"
+        className="p-1 font-normal"
+      >
+        <a href="#" className="flex items-center">
+          Docs
+        </a>
       </Typography>
     </ul>
   );
@@ -43,10 +76,20 @@ export function StickyNavbar() {
         <div className="flex items-center gap-4">
           <div className="mr-4 hidden lg:block">{navList}</div>
           <div className="flex items-center gap-x-1">
-            <Button variant="text" size="sm" className="hidden lg:inline-block" onClick={() => navigate("/login")}>
+            <Button
+              variant="text"
+              size="sm"
+              className="hidden lg:inline-block"
+              onClick={() => navigate("/login")}
+            >
               <span>Log In</span>
             </Button>
-            <Button variant="gradient" size="sm" className="hidden lg:inline-block" onClick={() => navigate("/signup")}>
+            <Button
+              variant="gradient"
+              size="sm"
+              className="hidden lg:inline-block"
+              onClick={() => navigate("/signup")}
+            >
               <span>Sign up</span>
             </Button>
           </div>
@@ -57,12 +100,34 @@ export function StickyNavbar() {
             onClick={() => setOpenNav(!openNav)}
           >
             {openNav ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" className="h-6 w-6" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                className="h-6 w-6"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             )}
           </IconButton>
