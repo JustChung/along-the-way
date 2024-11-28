@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Typography, Input, Button } from "@material-tailwind/react";
+import { Typography, Input, Button, Dialog } from "@material-tailwind/react";
 import { EyeSlashIcon, EyeIcon } from "@heroicons/react/24/solid";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../database/firebase";
@@ -10,6 +10,7 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);  // To manage the popup state
   const navigate = useNavigate();
 
   const togglePasswordVisibility = () => setPasswordShown((cur) => !cur);
@@ -19,7 +20,8 @@ export function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/"); // Redirect to the home page after successful login
+      setOpen(true);  // Open the popup on successful login
+      setTimeout(() => navigate("/"), 2000);  // Redirect after 2 seconds
     } catch (error) {
       setError("Error logging in. Please check your credentials.");
     }
@@ -110,6 +112,18 @@ export function Login() {
           </div>
         </form>
       </div>
+
+      {/* Success Popup */}
+      <Dialog open={open} handler={() => setOpen(false)}>
+        <div className="text-center p-8">
+          <Typography variant="h5" color="green" className="mb-2">
+            Login Successful!
+          </Typography>
+          <Typography className="text-gray-600 font-normal text-[16px] mb-6">
+            You are being redirected to the main app...
+          </Typography>
+        </div>
+      </Dialog>
     </section>
   );
 }

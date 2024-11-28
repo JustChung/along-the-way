@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Typography, Input, Button } from "@material-tailwind/react";
+import { Typography, Input, Button, Dialog } from "@material-tailwind/react";
 import { EyeSlashIcon, EyeIcon } from "@heroicons/react/24/solid";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../database/firebase";
@@ -10,6 +10,7 @@ export function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);  // To manage the popup state
   const navigate = useNavigate();
 
   const togglePasswordVisibility = () => setPasswordShown((cur) => !cur);
@@ -19,7 +20,8 @@ export function Signup() {
 
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/"); // Redirect to the home page after signup
+      setOpen(true);  // Open the popup on successful signup
+      setTimeout(() => navigate("/login"), 2000);  // Redirect after 2 seconds
     } catch (error) {
       setError("Error signing up. Please try again.");
     }
@@ -110,6 +112,18 @@ export function Signup() {
           </div>
         </form>
       </div>
+
+      {/* Success Popup */}
+      <Dialog open={open} handler={() => setOpen(false)}>
+        <div className="text-center p-8">
+          <Typography variant="h5" color="green" className="mb-2">
+            Account Created Successfully!
+          </Typography>
+          <Typography className="text-gray-600 font-normal text-[16px] mb-6">
+            You are being redirected to the login page...
+          </Typography>
+        </div>
+      </Dialog>
     </section>
   );
 }
