@@ -175,107 +175,104 @@ class MapService {
     return { point: nearestPoint, distance: minDistance };
   }
 
-  async getRestaurantsAlongRoute(
-    routeData: google.maps.DirectionsResult,
-    origin: Location,
-    options: SearchOptions
-  ): Promise<RestaurantSearchResult> {
-    if (!routeData.routes?.[0]?.overview_polyline) {
-      throw new Error('Invalid route data');
+async getRestaurantsAlongRoute(
+  routeData: google.maps.DirectionsResult,
+  origin: Location,
+  options: SearchOptions & { considerDetour?: boolean }
+): Promise<RestaurantSearchResult> {
+  if (!routeData.routes?.[0]?.overview_polyline) {
+    throw new Error('Invalid route data');
+  }
+
+  try {
+    // Get restaurants along route using the encoded polyline
+    const response = await axios.post(
+      `${this.placesApiBaseUrl}:searchText`,
+      {
+        textQuery: "restaurants",
+        searchAlongRouteParameters: {
+          polyline: {
+            encodedPolyline: routeData.routes[0].overview_polyline
+          }
+        },
+        maxResultCount: 50,
+        languageCode: "en"
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': this.apiKey,
+          'X-Goog-FieldMask': '*'
+        },
+      }
+    );
+
+    if (!response.data.places) {
+      return { restaurants: [], message: 'No restaurants found along the route' };
     }
 
-    try {
-      // First, get all restaurants along the route
-      const response = await axios.post(
-        `${this.placesApiBaseUrl}:searchText`,
-        {
-          textQuery: "restaurants",
-          searchAlongRouteParameters: {
-            polyline: {
-              encodedPolyline: routeData.routes[0].overview_polyline
-            }
-          },
-          maxResultCount: 50,
-          languageCode: "en"
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': this.apiKey,
-            'X-Goog-FieldMask': '*'
-          },
-        }
-      );
+    // Process restaurant data
+    let restaurants = response.data.places.map((place: any) => ({
+      id: place.id,
+      name: place.displayName,
+      location: {
+        lat: place.location.latitude,
+        lng: place.location.longitude,
+        address: place.formattedAddress,
+        addressComponents: place.addressComponents,
+        plusCode: place.plusCode
+      },
+      rating: place.rating || 0,
+      userRatingCount: place.userRatingCount,
+      priceLevel: convertPriceLevel(place.priceLevel),
+      photos: processPhotos(place.photos),
+      reviews: place.reviews?.map((review: any) => ({
+        name: review.name,
+        rating: review.rating,
+        text: review.text,
+        authorAttribution: review.authorAttribution,
+        publishTime: review.publishTime,
+        relativePublishTimeDescription: review.relativePublishTimeDescription
+      })),
+      phoneNumber: place.internationalPhoneNumber || place.nationalPhoneNumber,
+      websiteUri: place.websiteUri,
+      regularOpeningHours: processBusinessHours(place.regularOpeningHours),
+      currentOpeningHours: processBusinessHours(place.currentOpeningHours),
+      facilities: {
+        delivery: place.delivery,
+        dineIn: place.dineIn,
+        takeout: place.takeout,
+        reservable: place.reservable,
+        servesBreakfast: place.servesBreakfast,
+        servesLunch: place.servesLunch,
+        servesDinner: place.servesDinner,
+        servesBeer: place.servesBeer,
+        servesWine: place.servesWine,
+        servesBrunch: place.servesBrunch,
+        servesVegetarianFood: place.servesVegetarianFood,
+        outdoorSeating: place.outdoorSeating,
+        restroom: place.restroom,
+        wheelchairAccessible: place.accessibilityOptions?.wheelchairAccessibleEntrance
+      },
+      priceRange: place.priceRange,
+      businessStatus: place.businessStatus,
+      types: place.types,
+      distanceFromStart: 0,
+      detourMinutes: 0
+    }));
 
-      if (!response.data.places) {
-        return { restaurants: [], message: 'No restaurants found along the route' };
-      }
-
-      // Process basic restaurant data
-      let restaurants = response.data.places.map((place: any) => ({
-        id: place.id,
-        name: place.displayName,
-        location: {
-          lat: place.location.latitude,
-          lng: place.location.longitude,
-          address: place.formattedAddress,
-          addressComponents: place.addressComponents,
-          plusCode: place.plusCode
-        },
-        rating: place.rating || 0,
-        userRatingCount: place.userRatingCount,
-        priceLevel: convertPriceLevel(place.priceLevel),
-        photos: processPhotos(place.photos),
-        reviews: place.reviews?.map((review: any) => ({
-          name: review.name,
-          rating: review.rating,
-          text: review.text,
-          authorAttribution: review.authorAttribution,
-          publishTime: review.publishTime,
-          relativePublishTimeDescription: review.relativePublishTimeDescription
-        })),
-        phoneNumber: place.internationalPhoneNumber || place.nationalPhoneNumber,
-        websiteUri: place.websiteUri,
-        regularOpeningHours: processBusinessHours(place.regularOpeningHours),
-        currentOpeningHours: processBusinessHours(place.currentOpeningHours),
-        facilities: {
-          delivery: place.delivery,
-          dineIn: place.dineIn,
-          takeout: place.takeout,
-          reservable: place.reservable,
-          servesBreakfast: place.servesBreakfast,
-          servesLunch: place.servesLunch,
-          servesDinner: place.servesDinner,
-          servesBeer: place.servesBeer,
-          servesWine: place.servesWine,
-          servesBrunch: place.servesBrunch,
-          servesVegetarianFood: place.servesVegetarianFood,
-          outdoorSeating: place.outdoorSeating,
-          restroom: place.restroom,
-          wheelchairAccessible: place.accessibilityOptions?.wheelchairAccessibleEntrance
-        },
-        priceRange: place.priceRange,
-        businessStatus: place.businessStatus,
-        types: place.types,
-        distanceFromStart: 0, // Will be calculated later
-        detourMinutes: 0
-      }));
-
-      // Calculate detour times for each restaurant
+    // Calculate detour times and distances if needed
+    if (options.considerDetour) {
       const distanceMatrixService = new google.maps.DistanceMatrixService();
       const mainRoute = routeData.routes[0];
 
-      // Process restaurants in batches to avoid rate limiting
       const BATCH_SIZE = 10;
       for (let i = 0; i < restaurants.length; i += BATCH_SIZE) {
         const batch = restaurants.slice(i, i + BATCH_SIZE);
         await Promise.all(
           batch.map(async (restaurant) => {
             try {
-              // Find nearest point on route
               const { point } = await this.findNearestPointOnRoute(mainRoute, restaurant);
-              
-              // Calculate detour time
               const detourTime = await this.calculateDetourTime(
                 point,
                 restaurant,
@@ -295,37 +292,50 @@ class MapService {
         );
       }
 
-      // Filter restaurants based on criteria
-      restaurants = restaurants
-        .filter(restaurant => 
-          restaurant.rating >= options.minRating &&
-          restaurant.detourMinutes <= options.maxDetourMinutes
-        )
-        .sort((a, b) => a.detourMinutes - b.detourMinutes);
-
-      console.log(restaurants)
-
-      // Handle max stops logic
-      if (options.maxStops && options.maxStops > 0) {
-        const { selectedRestaurants, message } = this.selectRestaurantsBySegments(
-          restaurants,
-          options.maxStops
-        );
-        return { 
-          restaurants: selectedRestaurants,
-          message: `${message} All restaurants are within ${options.maxDetourMinutes} minutes of your route.`
-        };
-      }
-
-      return {
-        restaurants,
-        message: `Found ${restaurants.length} restaurants within ${options.maxDetourMinutes} minutes of your route.`
-      };
-    } catch (error) {
-      console.error('Error fetching restaurants:', error);
-      throw new Error(`Failed to fetch restaurants: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Filter by detour time and rating
+      restaurants = restaurants.filter(restaurant => 
+        restaurant.rating >= options.minRating &&
+        restaurant.detourMinutes <= (options.maxDetourMinutes || Infinity)
+      );
+    } else {
+      // Only filter by rating
+      restaurants = restaurants.filter(restaurant => 
+        restaurant.rating >= options.minRating
+      );
     }
+
+    // Calculate distances from route start for all restaurants
+    restaurants.forEach(restaurant => {
+      restaurant.distanceFromStart = this.calculateDistanceFromStart(
+        origin,
+        { lat: restaurant.location.lat, lng: restaurant.location.lng }
+      );
+    });
+
+    // Sort by distance along route
+    restaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
+
+    // Handle max stops
+    if (options.maxStops && options.maxStops > 0) {
+      const { selectedRestaurants, message } = this.selectRestaurantsBySegments(
+        restaurants,
+        options.maxStops
+      );
+      return { 
+        restaurants: selectedRestaurants,
+        message: `${message} ${options.considerDetour ? `All restaurants are within ${options.maxDetourMinutes} minutes of your route.` : ''}`
+      };
+    }
+
+    return {
+      restaurants,
+      message: `Found ${restaurants.length} restaurants${options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of your route` : ' along your route'}.`
+    };
+  } catch (error) {
+    console.error('Error fetching restaurants:', error);
+    throw new Error(`Failed to fetch restaurants: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
 
   private calculateDistanceFromStart(start: Location, point: { lat: number; lng: number }): number {
     return google.maps.geometry.spherical.computeDistanceBetween(

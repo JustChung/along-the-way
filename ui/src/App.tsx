@@ -14,9 +14,10 @@ import RouteCard from "./components/RouteCard/RouteCard";
 interface RouteSubmitData {
   origin: string;
   destination: string;
-  stops: number;
+  stops: number | null;
   rating: number;
-  maxDetourMinutes: number;
+  maxDetourMinutes: number | null;
+  considerDetour: boolean;
 }
 
 const App: React.FC = () => {
@@ -71,7 +72,8 @@ const App: React.FC = () => {
         {
           maxStops: data.stops,
           minRating: data.rating,
-          maxDetourMinutes: data.maxDetourMinutes,
+          maxDetourMinutes: data.maxDetourMinutes || 10,
+          considerDetour: data.considerDetour
         }
       );
 
@@ -105,6 +107,7 @@ const App: React.FC = () => {
     stops?: number;
     rating?: number;
     maxDetourMinutes?: number;
+    considerDetour?: boolean;
   }) => {
     // Validate required fields
     if (!request.origin || !request.destination) {
@@ -119,6 +122,7 @@ const App: React.FC = () => {
       stops: request.stops ?? null,
       rating: request.rating ?? 0,
       maxDetourMinutes: request.maxDetourMinutes ?? 10,
+      considerDetour: request.considerDetour ?? true
     };
 
     // Update RouteCard fields using the ref
@@ -129,6 +133,7 @@ const App: React.FC = () => {
         stops: request.stops,
         rating: request.rating,
         maxDetourMinutes: request.maxDetourMinutes,
+        considerDetour: request.considerDetour
       });
     }
 
@@ -158,7 +163,7 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      {/* Navbar is ouside Routes to appear on all pages */}
+      {/* Navbar is outside Routes to appear on all pages */}
       <div className="absolute w-full z-10">
         <StickyNavbar />
       </div>
@@ -166,7 +171,6 @@ const App: React.FC = () => {
       <Routes>
         <Route
           path="/"
-          // This is the main path/route
           element={
             <div className="min-h-screen bg-gray-50 relative">
               {/* Map and other components on the main page */}

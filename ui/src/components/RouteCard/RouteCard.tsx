@@ -9,7 +9,8 @@ interface RouteCardProps {
     destination: string;
     stops: number | null;
     rating: number;
-    maxDetourMinutes: number;
+    maxDetourMinutes: number | null;
+    considerDetour: boolean;
   }) => void;
 }
 
@@ -20,6 +21,7 @@ export interface RouteCardRef {
     stops?: number;
     rating?: number;
     maxDetourMinutes?: number;
+    considerDetour?: boolean;
   }) => void;
 }
 
@@ -30,6 +32,7 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
   const [stops, setStops] = useState<number | null>(null);
   const [rating, setRating] = useState<number>(0);
   const [maxDetourMinutes, setMaxDetourMinutes] = useState<number>(10);
+  const [considerDetour, setConsiderDetour] = useState(true);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
   const originAutocomplete = usePlacesAutocomplete("origin-input", {
@@ -50,11 +53,11 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
       if (data.stops !== undefined) setStops(data.stops);
       if (data.rating !== undefined) {
         setRating(data.rating);
-        setHoverRating(0); // Reset hover state when rating is updated externally
+        setHoverRating(0);
       }
       if (data.maxDetourMinutes !== undefined) setMaxDetourMinutes(data.maxDetourMinutes);
+      if (data.considerDetour !== undefined) setConsiderDetour(data.considerDetour);
       
-      // Show options if any advanced options are provided
       if (data.stops !== undefined || data.rating !== undefined || data.maxDetourMinutes !== undefined) {
         setShowOptions(true);
       }
@@ -87,7 +90,8 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
       destination,
       stops,
       rating,
-      maxDetourMinutes
+      maxDetourMinutes: considerDetour ? maxDetourMinutes : null,
+      considerDetour
     });
   };
 
@@ -141,26 +145,42 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
           {/* Expanded Options */}
           {showOptions && (
             <div className="space-y-4 pt-2">
-              {/* Maximum Detour Time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Maximum detour time (minutes)
+              {/* Consider Detour Checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="consider-detour"
+                  checked={considerDetour}
+                  onChange={(e) => setConsiderDetour(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="consider-detour" className="text-sm font-medium text-gray-700">
+                  Consider detour time
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="5"
-                    max="30"
-                    step="5"
-                    value={maxDetourMinutes}
-                    onChange={(e) => setMaxDetourMinutes(Number(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="text-sm text-gray-600 min-w-[3rem]">
-                    {maxDetourMinutes} min
-                  </span>
-                </div>
               </div>
+
+              {/* Maximum Detour Time (only shown if considerDetour is true) */}
+              {considerDetour && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Maximum detour time (minutes)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="5"
+                      max="30"
+                      step="5"
+                      value={maxDetourMinutes}
+                      onChange={(e) => setMaxDetourMinutes(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm text-gray-600 min-w-[3rem]">
+                      {maxDetourMinutes} min
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Number of Stops */}
               <div>
