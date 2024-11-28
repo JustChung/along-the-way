@@ -1,0 +1,1 @@
+export const auth: import("firebase/auth").Auth;
