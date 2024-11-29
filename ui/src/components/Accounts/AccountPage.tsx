@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../database/firebase';  // import Firebase auth
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 export function AccountPage() {
   const navigate = useNavigate();
-
-  // Check if the user is logged in
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isCurrentPasswordEntered, setIsCurrentPasswordEntered] = useState(false); // Flag for current password entry
+  const [isPasswordChangeFailed, setIsPasswordChangeFailed] = useState(false); // Flag for failed password change attempt
   const user = auth.currentUser;
 
   if (!user) {
-    // If the user is not logged in, redirect them to the login page
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center">
@@ -27,11 +31,57 @@ export function AccountPage() {
 
   // Function to send email verification
   const sendVerificationEmail = () => {
-    user.sendEmailVerification().then(() => {
-      alert('Verification email sent!');
-    }).catch((error) => {
-      console.error('Error sending verification email:', error);
-    });
+    if (user) {
+      user.sendEmailVerification().then(() => {
+        alert('Verification email sent!');
+      }).catch((error) => {
+        console.error('Error sending verification email:', error);
+      });
+    }
+  };
+
+  // Function to handle change password
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      setPasswordError('Please enter your current password');
+      return;
+    }
+    if (!newPassword) {
+      setPasswordError('Please enter a new password');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Reauthenticate the user with current password
+      const credential = EmailAuthProvider.credential(user.email || '', currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Now update the password
+      await updatePassword(user, newPassword);
+      alert('Password updated successfully!');
+      
+      // Reset the form after success
+      setCurrentPassword('');
+      setNewPassword('');
+      setIsCurrentPasswordEntered(false);
+      setIsPasswordChangeFailed(false); // Reset failed flag
+      setLoading(false);
+    } catch (error) {
+      setPasswordError('Failed to change password. Please check your current password. It has to be entered correctly in order to change it.');
+      setIsPasswordChangeFailed(true); // Set the failed flag
+      setLoading(false);
+    }
+  };
+
+  // Function to retry after failed attempt
+  const handleRetry = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setIsCurrentPasswordEntered(false);
+    setPasswordError('');
+    setIsPasswordChangeFailed(false); // Reset the failed flag
   };
 
   return (
@@ -48,7 +98,57 @@ export function AccountPage() {
 
         {/* Account Settings */}
         <div className="my-4">
-          <button className="bg-blue-500 text-white py-2 px-4 rounded mb-2">Change Password</button>
+          {/* Change Password Section */}
+          <p>Change Password: </p>
+          <div className="mb-4">
+            {!isCurrentPasswordEntered ? (
+              <>
+                <input
+                  type="password"
+                  placeholder="Enter your current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="border p-2"
+                />
+                <button
+                  onClick={() => setIsCurrentPasswordEntered(true)}
+                  className="bg-blue-500 text-white py-2 px-4 rounded mt-2"
+                  disabled={loading}
+                >
+                  Verify Current Password
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="password"
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="border p-2"
+                />
+                {passwordError && <p className="text-red-500">{passwordError}</p>}
+                {isPasswordChangeFailed ? (
+                  <button
+                    onClick={handleRetry}
+                    className="text-blue-500 mt-2"
+                  >
+                    Retry
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleChangePassword}
+                    className="bg-blue-500 text-white py-2 px-4 rounded mt-2"
+                    disabled={loading}
+                  >
+                    {loading ? 'Changing Password...' : 'Change Password'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Resend Verification */}
           <p>
             {user.emailVerified
               ? 'Email Verified'
