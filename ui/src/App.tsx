@@ -10,6 +10,7 @@ import ChatBot from "./components/ChatBot/ChatBot";
 import { StickyNavbar } from "./components/StickyNavbar/StickyNavbar";
 import { Alert, AlertDescription } from "./components/Alert";
 import RouteCard from "./components/RouteCard/RouteCard";
+import { AccountPage } from "./components/Accounts/AccountPage";
 
 interface RouteSubmitData {
   origin: string;
@@ -225,6 +226,7 @@ const App: React.FC = () => {
         {/* Routes to other pages in the nav bar */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/account" element={<AccountPage />} />
       </Routes>
     </Router>
   );
