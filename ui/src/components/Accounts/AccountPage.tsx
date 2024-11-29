@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { EyeSlashIcon, EyeIcon } from "@heroicons/react/24/solid";
 import { auth } from "../../database/firebase"; // import Firebase auth
 import {
   updatePassword,
@@ -11,6 +12,7 @@ import {
 
 export function AccountPage() {
   const navigate = useNavigate();
+  const [passwordShown, setPasswordShown] = useState(false); // State for toggling password visibility
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -18,6 +20,7 @@ export function AccountPage() {
   const [isCurrentPasswordEntered, setIsCurrentPasswordEntered] =
     useState(false); // Flag for current password entry
   const [isPasswordChangeFailed, setIsPasswordChangeFailed] = useState(false); // Flag for failed password change attempt
+  const togglePasswordVisibility = () => setPasswordShown(!passwordShown);
   const user = auth.currentUser;
 
   if (!user) {
@@ -95,7 +98,7 @@ export function AccountPage() {
       setLoading(false);
     } catch (error) {
       setPasswordError(
-        "Failed to change password. Please check your current password. It has to be entered correctly in order to change it."
+        "Failed to change password. Please check your current password. It has to be entered correctly before you can change it."
       );
       setIsPasswordChangeFailed(true); // Set the failed flag
       setLoading(false);
@@ -126,93 +129,125 @@ export function AccountPage() {
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center">
-      <div className="text-center">
-        <h2>Welcome, {user.displayName || user.email}!</h2>
-        <p>Here is your account information:</p>
+    <div className="min-h-screen flex justify-center items-center bg-gray-100">
+      <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
+        {/* Heading */}
+        <h1 className="text-3xl font-bold text-blue-600 mb-4">
+          Welcome, {user.displayName || user.email}!
+        </h1>
+        <p className="text-gray-700 mb-6">Here is your account information:</p>
 
         {/* Profile Information */}
-        <div className="my-4">
-          <p>Email: {user.email}</p>
-          <p>
-            Account Created:{" "}
+        <div className="mb-6">
+          <p className="text-gray-600">
+            <strong>Email:</strong> {user.email}
+          </p>
+          <p className="text-gray-600">
+            <strong>Account Created:</strong>{" "}
             {new Date(user.metadata.creationTime).toLocaleDateString()}
           </p>
         </div>
 
         {/* Account Settings */}
-        <div className="my-4">
-          {/* Change Password Section */}
-          <p>Change Password: </p>
-          <div className="mb-4">
-            {!isCurrentPasswordEntered ? (
-              <>
+        {/* Change Password Section */}
+        <div className="mb-6">
+          <p className="font-semibold text-gray-700 mb-2">Change Password:</p>
+          {!isCurrentPasswordEntered ? (
+            <div>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={passwordShown ? "text" : "password"}
                   placeholder="Enter your current password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="border p-2"
+                  className="border rounded-lg p-2 w-full focus:ring focus:ring-blue-200"
                 />
-                <button
-                  onClick={() => setIsCurrentPasswordEntered(true)}
-                  className="bg-blue-500 text-white py-2 px-4 rounded mt-2"
-                  disabled={loading}
+                <i
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-3 top-3 cursor-pointer"
                 >
-                  Verify Current Password
-                </button>
-              </>
-            ) : (
-              <>
+                  {passwordShown ? (
+                    <EyeIcon className="h-5 w-5 text-gray-500" />
+                  ) : (
+                    <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                  )}
+                </i>
+              </div>
+              <button
+                onClick={() => setIsCurrentPasswordEntered(true)}
+                className="bg-blue-500 text-white py-2 px-4 rounded mt-3 w-full hover:bg-blue-600"
+                disabled={loading}
+              >
+                Verify Current Password
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={passwordShown ? "text" : "password"}
                   placeholder="Enter new password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="border p-2"
+                  className="border rounded-lg p-2 w-full focus:ring focus:ring-blue-200"
                 />
-                {passwordError && (
-                  <p className="text-red-500">{passwordError}</p>
-                )}
-                {isPasswordChangeFailed ? (
+                <i
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-3 top-3 cursor-pointer"
+                >
+                  {passwordShown ? (
+                    <EyeIcon className="h-5 w-5 text-gray-500" />
+                  ) : (
+                    <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                  )}
+                </i>
+              </div>
+              {passwordError && (
+                <p className="text-red-500 mt-2">{passwordError}</p>
+              )}
+               {isPasswordChangeFailed ? (
                   <button onClick={handleRetry} className="text-blue-500 mt-2">
                     Retry
                   </button>
                 ) : (
-                  <button
-                    onClick={handleChangePassword}
-                    className="bg-blue-500 text-white py-2 px-4 rounded mt-2"
-                    disabled={loading}
-                  >
-                    {loading ? "Changing Password..." : "Change Password"}
-                  </button>
+              <button
+                onClick={handleChangePassword}
+                className="bg-blue-500 text-white py-2 px-4 rounded mt-3 w-full hover:bg-blue-600"
+                disabled={loading}
+              >
+                {loading ? "Changing Password..." : "Change Password"}
+              </button>
                 )}
-              </>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          {/* Resend Verification */}
-          <p>
-            {user.emailVerified ? "Email Verified" : "Email Not Verified"}{" "}
-            <button onClick={sendVerificationEmail} className="text-blue-500">
+        {/* Verification Section */}
+        <div className="mb-6">
+          <p className="text-gray-700">
+            {user.emailVerified ? "Email Verified" : "Email Not Verified"}
+            <button
+              onClick={sendVerificationEmail}
+              className="text-blue-500 hover:underline ml-2"
+            >
               Resend Verification
             </button>
           </p>
         </div>
 
         {/* Activity History */}
-        <div className="my-4">
-          <p>
-            Last Login:{" "}
+        <div className="mb-6">
+          <p className="text-gray-600">
+            <strong>Last Login:</strong>{" "}
             {new Date(user.metadata.lastSignInTime).toLocaleString()}
           </p>
         </div>
 
-        {/* Account Deletion or Deactivation */}
-        <div className="my-4">
+        {/* Account Deletion */}
+        <div>
           <button
-            className="bg-red-500 text-white py-2 px-4 rounded"
             onClick={deleteAccount}
+            className="bg-red-500 text-white py-2 px-4 rounded w-full hover:bg-red-600"
           >
             Delete Account
           </button>
@@ -221,3 +256,4 @@ export function AccountPage() {
     </div>
   );
 }
+
