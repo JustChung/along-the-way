@@ -11,6 +11,8 @@ import { StickyNavbar } from "./components/StickyNavbar/StickyNavbar";
 import { Alert, AlertDescription } from "./components/Alert";
 import RouteCard from "./components/RouteCard/RouteCard";
 import { AccountPage } from "./components/Accounts/AccountPage";
+import { SavedRoutes } from "./components/Map/SavedRoutes";
+import { ChatHistory } from "./components/ChatBot/ChatHistory";
 
 interface RouteSubmitData {
   origin: string;
@@ -227,6 +229,8 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/savedroutes" element={<SavedRoutes />} />
+        <Route path="/chathistory" element={<ChatHistory />} />
       </Routes>
     </Router>
   );

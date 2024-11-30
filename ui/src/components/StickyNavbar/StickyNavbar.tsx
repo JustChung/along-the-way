@@ -58,7 +58,8 @@ export function StickyNavbar() {
         color="blue-gray"
         className="p-1 font-normal"
       >
-        <Link to="#">Docs</Link>
+    
+        <Link to="/savedroutes">Saved Routes</Link>
       </Typography>
       <Typography
         as="li"
@@ -66,15 +67,7 @@ export function StickyNavbar() {
         color="blue-gray"
         className="p-1 font-normal"
       >
-        <Link to="#">Saved Routes</Link>
-      </Typography>
-      <Typography
-        as="li"
-        variant="small"
-        color="blue-gray"
-        className="p-1 font-normal"
-      >
-        <Link to="#">Chat History</Link>
+        <Link to="chathistory">Chat History</Link>
       </Typography>
     </ul>
   );
