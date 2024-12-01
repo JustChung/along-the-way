@@ -15,6 +15,7 @@ import { SavedRoutes } from "./components/Map/SavedRoutes";
 import { ChatHistory } from "./components/ChatBot/ChatHistory";
 
 interface RouteSubmitData {
+  search: string | null;
   origin: string;
   destination: string;
   stops: number | null;
@@ -73,6 +74,7 @@ const App: React.FC = () => {
         routeData,
         originLocation,
         {
+          search: data.search || "restaurants",
           maxStops: data.stops,
           minRating: data.rating,
           maxDetourMinutes: data.maxDetourMinutes || 10,
@@ -105,6 +107,7 @@ const App: React.FC = () => {
   };
 
   const handleChatBotRouteRequest = (request: {
+    search?: string;
     origin?: string;
     destination?: string;
     stops?: number;
@@ -120,6 +123,7 @@ const App: React.FC = () => {
 
     // Create route submit data with defaults for missing values
     const routeData: RouteSubmitData = {
+      search: request.search ?? "restaurants",
       origin: request.origin,
       destination: request.destination,
       stops: request.stops ?? null,
@@ -131,6 +135,7 @@ const App: React.FC = () => {
     // Update RouteCard fields using the ref
     if (routeCardRef.current) {
       routeCardRef.current.updateFields({
+        search: request.search,
         origin: request.origin,
         destination: request.destination,
         stops: request.stops,

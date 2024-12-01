@@ -5,6 +5,7 @@ import { usePlacesAutocomplete } from '../../hooks/usePlacesAutocomplete';
 
 interface RouteCardProps {
   onSubmit: (data: {
+    search: string;
     origin: string;
     destination: string;
     stops: number | null;
@@ -16,6 +17,7 @@ interface RouteCardProps {
 
 export interface RouteCardRef {
   updateFields: (data: {
+    search?: string;
     origin?: string;
     destination?: string;
     stops?: number;
@@ -28,6 +30,7 @@ export interface RouteCardRef {
 const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
+  const [search, setSearch] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [stops, setStops] = useState<number | null>(null);
   const [rating, setRating] = useState<number>(0);
@@ -48,6 +51,7 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     updateFields: (data) => {
+      if (data.search !== undefined) setSearch(data.search);
       if (data.origin !== undefined) setOrigin(data.origin);
       if (data.destination !== undefined) setDestination(data.destination);
       if (data.stops !== undefined) setStops(data.stops);
@@ -86,6 +90,7 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
 
   const handleSubmit = () => {
     onSubmit({
+      search,
       origin,
       destination,
       stops,
@@ -100,11 +105,17 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
       <div className="bg-white rounded-lg shadow-lg p-6 w-96 opacity-95">
         <div className="space-y-4">
           {/* Header */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2">
             <MapIcon className="w-8 h-8 p-1"/>
             <span className="text-xl font-semibold text-gray-800">Route</span>
           </div>
-          
+          <input
+              id="search-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              className="w-full p-2 border-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />          
           {/* Origin Input */}
           <div className="relative">
             <MapPinIcon className="absolute left-2 top-2.5 w-5 h-5 text-green-600"/>
