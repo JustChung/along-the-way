@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../database/firebase"; // import Firebase auth
 import RestaurantCard from "./RestaurantCard";
@@ -86,10 +86,10 @@ export const SavedRoutes = () => {
         ))}
       </div>
         <button
-          onClick={() => navigate("/login")}
+          onClick={() => navigate("/")}
           className="mt-4 bg-blue-500 text-white py-2 px-4 rounded"
         >
-          Go to Login
+          Go to Home
         </button>
       </div>
     </div>

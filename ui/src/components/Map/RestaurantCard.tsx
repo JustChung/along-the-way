@@ -3,7 +3,6 @@ import { ClockIcon } from '@heroicons/react/24/solid';
 import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { getTextContent } from './Map';
-import { InfoWindowContent } from './Map';
 
 interface Restaurant {
   name: {
@@ -13,8 +12,31 @@ interface Restaurant {
   location?: {
     lat: number;
     lng: number;
+    formattedAddress?: string;
   };
   photos?: { name: string }[];
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: number;
+  detourMinutes?: number;
+  regularOpeningHours?: {
+    openNow: boolean;
+  };
+  facilities?: {
+    outdoorSeating?: boolean;
+    reservable?: boolean;
+    wheelchairAccessible?: boolean;
+  };
+  reviews?: {
+    authorAttribution?: {
+      displayName?: string;
+    };
+    rating?: number;
+    text?: string;
+    relativePublishTimeDescription?: string;
+  }[];
+  phoneNumber?: string;
+  websiteUri?: string;
 }
 
 interface RestaurantCardProps {
@@ -64,8 +86,6 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
   };
 
   const getGoogleReviewUrl = () => {
-    const placeName = encodeURIComponent(typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name);
-    const placeLocation = encodeURIComponent(`${restaurant.location?.lat},${restaurant.location?.lng}`);
     return `https://search.google.com/local/writereview?placeid=${restaurant.id}`;
   };
 
