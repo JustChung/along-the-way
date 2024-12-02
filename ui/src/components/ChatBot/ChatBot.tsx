@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Restaurant } from '../../types';
-
+import { v4 as uuidv4 } from 'uuid'; // Import UUID library
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -35,7 +35,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
   destination,
   onRouteRequest 
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [messages, setMessages] = useState<Message[]>([{
     text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants along your route or plan a new route. For example:\n\n- 'Find restaurants between LA and San Diego'\n- 'What are the highest-rated restaurants on my route?'\n- 'Which restaurants have outdoor seating?'",
     isUser: false,
@@ -45,6 +45,18 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const conversationId = useRef(uuidv4()); // Generate a unique ID for each conversation
+
+  useEffect(() => {
+    const savedConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
+    const updatedConversations = savedConversations.map((conv: any) => 
+      conv.id === conversationId.current ? { ...conv, messages } : conv
+    );
+    if (!updatedConversations.some((conv: any) => conv.id === conversationId.current)) {
+      updatedConversations.push({ id: conversationId.current, messages });
+    }
+    localStorage.setItem('chatConversations', JSON.stringify(updatedConversations));
+  }, [messages]);
 
   // Existing scroll and effect hooks remain the same
   const scrollToBottom = () => {

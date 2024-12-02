@@ -1,17 +1,49 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { useLoadScript, GoogleMap, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
-import { Location, Restaurant } from '../../types';
+import React, { useState, useEffect } from 'react';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { getTextContent } from './Map';
 
-export const getTextContent = (text: string | { text: string } | any): string => {
-  if (typeof text === 'string') return text;
-  if (text && typeof text === 'object' && 'text' in text) return text.text;
-  return '';
-};
+interface Restaurant {
+  name: {
+    text: string;
+    languageCode: string;
+  };
+  location?: {
+    lat: number;
+    lng: number;
+    formattedAddress?: string;
+  };
+  photos?: { name: string }[];
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: number;
+  detourMinutes?: number;
+  regularOpeningHours?: {
+    openNow: boolean;
+  };
+  facilities?: {
+    outdoorSeating?: boolean;
+    reservable?: boolean;
+    wheelchairAccessible?: boolean;
+  };
+  reviews?: {
+    authorAttribution?: {
+      displayName?: string;
+    };
+    rating?: number;
+    text?: string;
+    relativePublishTimeDescription?: string;
+  }[];
+  phoneNumber?: string;
+  websiteUri?: string;
+}
 
-export const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => {
+interface RestaurantCardProps {
+  restaurant: Restaurant;
+}
+
+const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [imageError, setImageError] = useState(false);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
@@ -54,13 +86,11 @@ export const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restau
   };
 
   const getGoogleReviewUrl = () => {
-    const placeName = encodeURIComponent(typeof restaurant.name === 'object' ? restaurant.name.text : restaurant.name);
-    const placeLocation = encodeURIComponent(`${restaurant.location.lat},${restaurant.location.lng}`);
     return `https://search.google.com/local/writereview?placeid=${restaurant.id}`;
   };
 
   return (
-    <div className="p-2 max-w-xs" onClick={handleContainerClick}>
+    <div className="p-4 border border-gray-300 rounded-lg shadow-sm" onClick={handleContainerClick}>
       {isLoadingImage ? (
         <div className="mb-3 w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -70,7 +100,7 @@ export const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restau
           <img
             src={imageUrl}
             alt={`${restaurant.name} exterior`}
-            className="w-full h-48 object-cover rounded-lg"
+            className="w-full h-80 object-cover rounded-lg"
             onError={() => setImageError(true)}
           />
         </div>
@@ -205,179 +235,4 @@ export const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restau
   );
 };
 
-const getMarkerIcon = (detourMinutes: number) => {
-  let color;
-  if (detourMinutes <= 5) {
-    color = 'blue';
-  } else if (detourMinutes <= 10) {
-    color = 'purple';
-  } else if (detourMinutes <= 15) {
-    color = 'yellow';
-  } else {
-    color = 'pink';
-  }
-  return `https://maps.google.com/mapfiles/ms/icons/${color}-dot.png`;
-};
-
-interface MapProps {
-  center: Location;
-  zoom: number;
-  restaurants: Restaurant[];
-  origin?: Location | null;
-  destination?: Location | null;
-  onRestaurantSelect?: (restaurant: Restaurant) => void;
-  selectedRestaurant?: Restaurant | null;
-}
-
-const Map: React.FC<MapProps> = ({
-  center,
-  zoom,
-  restaurants,
-  origin,
-  destination,
-  onRestaurantSelect,
-  selectedRestaurant: externalSelectedRestaurant
-}) => {
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const libRef = React.useRef(['places'] as const);
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: libRef.current,
-  });
-
-  useEffect(() => {
-    if (externalSelectedRestaurant) {
-      setSelectedRestaurant(externalSelectedRestaurant);
-    }
-  }, [externalSelectedRestaurant]);
-
-  const mapContainerStyle = {
-    width: '100%',
-    height: '100%',
-  };
-
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(() => {
-    setMap(null);
-  }, []);
-
-  useEffect(() => {
-    if (!isLoaded || !origin || !destination || !window.google) return;
-
-    const directionsService = new window.google.maps.DirectionsService();
-
-    directionsService.route(
-      {
-        origin: { lat: origin.lat, lng: origin.lng },
-        destination: { lat: destination.lat, lng: destination.lng },
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === 'OK' && result) {
-          setDirections(result);
-        } else {
-          console.error(`Error fetching directions ${status}`);
-        }
-      }
-    );
-  }, [origin, destination, isLoaded]);
-
-  const handleMarkerClick = useCallback((restaurant: Restaurant) => {
-    setSelectedRestaurant(restaurant);
-    if (onRestaurantSelect) {
-      onRestaurantSelect(restaurant);
-    }
-  }, [onRestaurantSelect]);
-
-  if (loadError) {
-    return <div className="p-4 text-red-500">Error loading maps</div>;
-  }
-
-  if (!isLoaded) {
-    return <div className="p-4">Loading maps...</div>;
-  }
-
-  return (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      center={center}
-      zoom={zoom}
-      onLoad={onLoad}
-      onUnmount={onUnmount}
-      options={{
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      }}
-    >
-      {origin && (
-        <Marker
-          position={{ lat: origin.lat, lng: origin.lng }}
-          icon={{
-            url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-            scaledSize: new window.google.maps.Size(32, 32),
-          }}
-          title="Starting Point"
-        />
-      )}
-
-      {destination && (
-        <Marker
-          position={{ lat: destination.lat, lng: destination.lng }}
-          icon={{
-            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-            scaledSize: new window.google.maps.Size(32, 32),
-          }}
-          title="Destination"
-        />
-      )}
-
-      {directions && (
-        <DirectionsRenderer
-          directions={directions}
-          options={{
-            suppressMarkers: true,
-            polylineOptions: {
-              strokeColor: '#4A90E2',
-              strokeWeight: 6,
-              strokeOpacity: 0.8,
-            },
-          }}
-        />
-      )}
-
-      {restaurants.map((restaurant, index) => (
-        <Marker
-          key={restaurant.id || `restaurant-${index}`}
-          position={{ lat: restaurant.location.lat, lng: restaurant.location.lng }}
-          onClick={() => handleMarkerClick(restaurant)}
-          icon={{
-            url: getMarkerIcon(restaurant.detourMinutes),
-            scaledSize: new window.google.maps.Size(32, 32),
-          }}
-        />
-      ))}
-
-      {selectedRestaurant && (
-        <InfoWindow
-          position={{
-            lat: selectedRestaurant.location.lat,
-            lng: selectedRestaurant.location.lng,
-          }}
-          onCloseClick={() => setSelectedRestaurant(null)}
-        >
-          <InfoWindowContent restaurant={selectedRestaurant} />
-        </InfoWindow>
-      )}
-    </GoogleMap>
-  );
-};
-
-export default Map;
+export default RestaurantCard;
