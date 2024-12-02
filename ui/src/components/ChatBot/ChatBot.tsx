@@ -56,7 +56,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
       updatedConversations.push({ id: conversationId.current, messages });
     }
     localStorage.setItem('chatConversations', JSON.stringify(updatedConversations));
-    console.log("setChatConversations: ", updatedConversations);
   }, [messages]);
 
   // Existing scroll and effect hooks remain the same

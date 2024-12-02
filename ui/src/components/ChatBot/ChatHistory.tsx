@@ -10,7 +10,6 @@ export function ChatHistory() {
 
   const getChatHistory = () => {
     const savedConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
-    console.log("savedConversations: ", savedConversations);
     setMessages(savedConversations);
   };
 
@@ -36,14 +35,14 @@ export function ChatHistory() {
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-100">
-      <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
+      <div className="bg-white shadow-md rounded-lg p-8 max-w-4xl w-full mt-24">
         <h1 className="text-3xl font-bold text-blue-600 mb-4">
           Welcome, {user.displayName || user.email}!
         </h1>
         <p className="text-gray-700 mb-6">Here are your chat histories:</p>
-        <div className="h-64 overflow-y-auto mb-3">
+        <div className="overflow-y-auto mb-3">
           {messages.map((conversation, index) => (
-            <div key={index} className="mb-4">
+            <div key={index} className="mb-8 p-4 bg-gray-100 rounded-lg shadow-md">
               <h2 className="text-xl font-semibold mb-2">Conversation {index + 1}</h2>
               {conversation.messages.map((message: any, msgIndex: number) => (
                 <div key={msgIndex} className={`mb-2 ${message.isUser ? 'text-right' : 'text-left'}`}>
