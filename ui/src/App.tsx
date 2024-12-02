@@ -104,9 +104,6 @@ const App: React.FC = () => {
       timestamp: new Date(),
     };
     saveRouteToLocalStorage(route);
-    console.log("Route saved to local storage:", route);
-
-    console.log("Routes returned from getRotuesFromLocalStorage", getRoutesFromLocalStorage());
 
       if (result.restaurants.length === 0) {
         setError(
