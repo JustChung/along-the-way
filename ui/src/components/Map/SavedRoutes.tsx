@@ -1,10 +1,42 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../database/firebase"; // import Firebase auth
 
-export function SavedRoutes() {
+const getRoutesFromLocalStorage = () => {
+  return JSON.parse(localStorage.getItem('routes') || '[]');
+};
+
+export const SavedRoutes = () => {
   const navigate = useNavigate();
   const user = auth.currentUser;
+  interface Route {
+    origin: string;
+    destination: string;
+    stops: string[];
+    rating: number;
+    maxDetourMinutes: number;
+    considerDetour: boolean;
+    restaurants: {
+      name: {
+        test: string;
+        languageCode: string;
+      };
+      location?: {
+        lat: number;
+        lng: number;
+      };
+      text?: string;
+      languageCode?: string;
+    }[];
+  }
+  
+  const [routes, setRoutes] = useState<Route[]>([]);
+
+  useEffect(() => {
+    const savedRoutes = getRoutesFromLocalStorage();
+    console.log("Loaded routes from local storage:", savedRoutes);
+    setRoutes(savedRoutes);
+  }, []);
 
   if (!user) {
     return (
@@ -30,7 +62,32 @@ export function SavedRoutes() {
           Welcome, {user.displayName || user.email}!
         </h1>
         <p className="text-gray-700 mb-6">Here are your saved routes:</p>
-    </div>
+        <div>
+          <h2>Saved Routes</h2>
+          {routes.map((route, index) => (
+            <div key={index}>
+              <h3>Route {index + 1}</h3>
+              <p>Origin: {route.origin}</p>
+              <p>Destination: {route.destination}</p>
+              <p>Stops: {route.stops}</p>
+              <p>Rating: {route.rating}</p>
+              <p>Max Detour Minutes: {route.maxDetourMinutes}</p>
+              <p>Consider Detour: {route.considerDetour ? "Yes" : "No"}</p>
+              <h4>Restaurants:</h4>
+              <ul>
+                {route.restaurants.map((restaurant, idx) => (
+                  <li key={idx}>
+                    <p>Name: {restaurant.name.text}</p>
+                    {restaurant.location && (
+                      <p>Location: {restaurant.location.lat}, {restaurant.location.lng}</p>
+                    )}
+                  </li> 
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
-}
+};

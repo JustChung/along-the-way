@@ -40,6 +40,16 @@ const App: React.FC = () => {
 
   const routeCardRef = React.useRef<HTMLDivElement>(null);
 
+  const saveRouteToLocalStorage = (route) => {
+    const savedRoutes = JSON.parse(localStorage.getItem('routes') || '[]');
+    savedRoutes.push(route);
+    localStorage.setItem('routes', JSON.stringify(savedRoutes));
+  };
+  
+  const getRoutesFromLocalStorage = () => {
+    return JSON.parse(localStorage.getItem('routes') || '[]');
+  };
+
   const handleRouteSubmit = async (data: RouteSubmitData) => {
     setIsLoading(true);
     setError(null);
@@ -80,7 +90,23 @@ const App: React.FC = () => {
         }
       );
 
-      setRestaurants(result.restaurants);
+      setRestaurants(result.restaurants);``
+
+    // Save route data to local storage
+    const route = {
+      origin: data.origin,
+      destination: data.destination,
+      stops: data.stops,
+      rating: data.rating,
+      maxDetourMinutes: data.maxDetourMinutes,
+      considerDetour: data.considerDetour,
+      restaurants: restaurants,
+      timestamp: new Date(),
+    };
+    saveRouteToLocalStorage(route);
+    console.log("Route saved to local storage:", route);
+
+    console.log("Routes returned from getRotuesFromLocalStorage", getRoutesFromLocalStorage());
 
       if (result.restaurants.length === 0) {
         setError(
