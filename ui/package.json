@@ -21,7 +21,8 @@
     "react-hook-form": "^7.53.1",
     "react-router-dom": "^6.28.0",
     "react-sliding-pane": "^7.3.0",
-    "ui": "file:"
+    "ui": "file:",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
