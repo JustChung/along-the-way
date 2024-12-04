@@ -175,167 +175,256 @@ class MapService {
     return { point: nearestPoint, distance: minDistance };
   }
 
-async getRestaurantsAlongRoute(
-  routeData: google.maps.DirectionsResult,
-  origin: Location,
-  options: SearchOptions & { considerDetour?: boolean }
-): Promise<RestaurantSearchResult> {
-  if (!routeData.routes?.[0]?.overview_polyline) {
-    throw new Error('Invalid route data');
-  }
-
-  try {
-    // Get restaurants along route using the encoded polyline
-    const response = await axios.post(
-      `${this.placesApiBaseUrl}:searchText`,
-      {
-        textQuery: "restaurants",
-        searchAlongRouteParameters: {
-          polyline: {
-            encodedPolyline: routeData.routes[0].overview_polyline
-          }
-        },
-        maxResultCount: 50,
-        languageCode: "en"
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': this.apiKey,
-          'X-Goog-FieldMask': '*'
-        },
-      }
-    );
-
-    if (!response.data.places) {
-      return { restaurants: [], message: 'No restaurants found along the route' };
+  async getRestaurantsAlongRoute(
+    routeData: google.maps.DirectionsResult,
+    origin: Location,
+    options: SearchOptions & { considerDetour?: boolean }
+  ): Promise<RestaurantSearchResult> {
+    if (!routeData.routes?.[0]?.overview_path) {
+      throw new Error('Invalid route data');
     }
-
-    // Process restaurant data
-    let restaurants = response.data.places.map((place: any) => ({
-      id: place.id,
-      name: place.displayName,
-      location: {
-        lat: place.location.latitude,
-        lng: place.location.longitude,
-        address: place.formattedAddress,
-        addressComponents: place.addressComponents,
-        plusCode: place.plusCode
-      },
-      rating: place.rating || 0,
-      userRatingCount: place.userRatingCount,
-      priceLevel: convertPriceLevel(place.priceLevel),
-      photos: processPhotos(place.photos),
-      reviews: place.reviews?.map((review: any) => ({
-        name: review.name,
-        rating: review.rating,
-        text: review.text,
-        authorAttribution: review.authorAttribution,
-        publishTime: review.publishTime,
-        relativePublishTimeDescription: review.relativePublishTimeDescription
-      })),
-      phoneNumber: place.internationalPhoneNumber || place.nationalPhoneNumber,
-      websiteUri: place.websiteUri,
-      regularOpeningHours: processBusinessHours(place.regularOpeningHours),
-      currentOpeningHours: processBusinessHours(place.currentOpeningHours),
-      facilities: {
-        delivery: place.delivery,
-        dineIn: place.dineIn,
-        takeout: place.takeout,
-        reservable: place.reservable,
-        servesBreakfast: place.servesBreakfast,
-        servesLunch: place.servesLunch,
-        servesDinner: place.servesDinner,
-        servesBeer: place.servesBeer,
-        servesWine: place.servesWine,
-        servesBrunch: place.servesBrunch,
-        servesVegetarianFood: place.servesVegetarianFood,
-        outdoorSeating: place.outdoorSeating,
-        restroom: place.restroom,
-        wheelchairAccessible: place.accessibilityOptions?.wheelchairAccessibleEntrance
-      },
-      priceRange: place.priceRange,
-      businessStatus: place.businessStatus,
-      types: place.types,
-      distanceFromStart: 0,
-      detourMinutes: 0
-    }));
-
-    // Calculate detour times and distances if needed
-    if (options.considerDetour) {
-      const distanceMatrixService = new google.maps.DistanceMatrixService();
-      const mainRoute = routeData.routes[0];
-
-      const BATCH_SIZE = 10;
-      for (let i = 0; i < restaurants.length; i += BATCH_SIZE) {
-        const batch = restaurants.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(async (restaurant) => {
-            try {
-              const { point } = await this.findNearestPointOnRoute(mainRoute, restaurant);
-              const detourTime = await this.calculateDetourTime(
-                point,
-                restaurant,
-                distanceMatrixService
-              );
-              
-              restaurant.detourMinutes = detourTime;
-              restaurant.distanceFromStart = this.calculateDistanceFromStart(
-                origin,
-                { lat: restaurant.location.lat, lng: restaurant.location.lng }
-              );
-            } catch (error) {
-              console.error(`Error calculating detour for restaurant ${restaurant.id}:`, error);
-              restaurant.detourMinutes = Infinity;
+  
+    try {
+      const route = routeData.routes[0];
+      const path = route.overview_path;
+      
+      // Calculate total route distance in meters
+      let totalDistance = 0;
+      for (let i = 1; i < path.length; i++) {
+        totalDistance += google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
+      }
+  
+      // Dynamically determine number of segments based on route length
+      // For routes under 5km (≈3 miles), use single segment
+      // For longer routes, create a segment every 5km, with a minimum of 2 segments
+      const MIN_SEGMENT_LENGTH = 5000; // 5km in meters
+      const numberOfSegments = Math.max(2, Math.ceil(totalDistance / MIN_SEGMENT_LENGTH));
+      const SEGMENT_LENGTH = totalDistance / numberOfSegments;
+      
+      let allRestaurants: Restaurant[] = [];
+      
+      // Process route in segments
+      for (let segmentIndex = 0; segmentIndex < numberOfSegments; segmentIndex++) {
+        // Create overlapping segments to avoid gaps
+        const segmentStartDistance = segmentIndex * SEGMENT_LENGTH * 0.8; // 20% overlap with previous segment
+        const segmentEndDistance = Math.min(
+          (segmentIndex + 1) * SEGMENT_LENGTH * 1.2, // 20% overlap with next segment
+          totalDistance
+        );
+        
+        let currentDistance = 0;
+        let segmentPath: google.maps.LatLng[] = [];
+        let startPointFound = false;
+  
+        // Build segment path
+        for (let i = 1; i < path.length; i++) {
+          const pointDistance = google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
+          const newDistance = currentDistance + pointDistance;
+  
+          // Add points within segment bounds
+          if (currentDistance <= segmentEndDistance) {
+            if (currentDistance >= segmentStartDistance && !startPointFound) {
+              // Add start point (interpolated)
+              const ratio = (segmentStartDistance - currentDistance) / pointDistance;
+              const startPoint = google.maps.geometry.spherical.interpolate(path[i-1], path[i], ratio);
+              segmentPath.push(startPoint);
+              startPointFound = true;
             }
-          })
+  
+            if (startPointFound) {
+              segmentPath.push(path[i]);
+            }
+          }
+  
+          if (newDistance > segmentEndDistance) {
+            // Add end point (interpolated)
+            const ratio = (segmentEndDistance - currentDistance) / pointDistance;
+            const endPoint = google.maps.geometry.spherical.interpolate(path[i-1], path[i], ratio);
+            segmentPath.push(endPoint);
+            break;
+          }
+  
+          currentDistance = newDistance;
+        }
+  
+        // Ensure segment has at least two points
+        if (segmentPath.length < 2) {
+          continue;
+        }
+  
+        // Encode segment path
+        const encodedPath = google.maps.geometry.encoding.encodePath(segmentPath);
+  
+        // Calculate max results for this segment based on its proportion of the total route
+        const segmentLength = Math.abs(segmentEndDistance - segmentStartDistance);
+        const segmentMaxResults = Math.ceil((segmentLength / totalDistance) * 50);
+  
+        // Search for restaurants along this segment
+        const response = await axios.post(
+          `${this.placesApiBaseUrl}:searchText`,
+          {
+            textQuery: "restaurants",
+            searchAlongRouteParameters: {
+              polyline: {
+                encodedPolyline: encodedPath
+              }
+            },
+            maxResultCount: segmentMaxResults,
+            languageCode: "en"
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': this.apiKey,
+              'X-Goog-FieldMask': '*'
+            },
+          }
+        );
+  
+        if (response.data.places) {
+          // Process restaurants from this segment
+          const segmentRestaurants = response.data.places.map((place: any) => ({
+            id: place.id,
+            name: place.displayName,
+            location: {
+              lat: place.location.latitude,
+              lng: place.location.longitude,
+              address: place.formattedAddress,
+              addressComponents: place.addressComponents,
+              plusCode: place.plusCode
+            },
+            rating: place.rating || 0,
+            userRatingCount: place.userRatingCount,
+            priceLevel: convertPriceLevel(place.priceLevel),
+            photos: processPhotos(place.photos),
+            reviews: place.reviews?.map((review: any) => ({
+              name: review.name,
+              rating: review.rating,
+              text: review.text,
+              authorAttribution: review.authorAttribution,
+              publishTime: review.publishTime,
+              relativePublishTimeDescription: review.relativePublishTimeDescription
+            })),
+            phoneNumber: place.internationalPhoneNumber || place.nationalPhoneNumber,
+            websiteUri: place.websiteUri,
+            regularOpeningHours: processBusinessHours(place.regularOpeningHours),
+            currentOpeningHours: processBusinessHours(place.currentOpeningHours),
+            facilities: {
+              delivery: place.delivery,
+              dineIn: place.dineIn,
+              takeout: place.takeout,
+              reservable: place.reservable,
+              servesBreakfast: place.servesBreakfast,
+              servesLunch: place.servesLunch,
+              servesDinner: place.servesDinner,
+              servesBeer: place.servesBeer,
+              servesWine: place.servesWine,
+              servesBrunch: place.servesBrunch,
+              servesVegetarianFood: place.servesVegetarianFood,
+              outdoorSeating: place.outdoorSeating,
+              restroom: place.restroom,
+              wheelchairAccessible: place.accessibilityOptions?.wheelchairAccessibleEntrance
+            },
+            priceRange: place.priceRange,
+            businessStatus: place.businessStatus,
+            types: place.types,
+            distanceFromStart: 0,
+            detourMinutes: 0
+          }));
+  
+          allRestaurants = allRestaurants.concat(segmentRestaurants);
+        }
+      }
+  
+      // Remove duplicates using Map
+      allRestaurants = Array.from(new Map(allRestaurants.map(r => [r.id, r])).values());
+  
+      // Calculate accurate distances from route start for all restaurants
+      for (const restaurant of allRestaurants) {
+        let minDistance = Infinity;
+        let distanceFromStart = 0;
+        let accumulatedDistance = 0;
+  
+        // Find closest point on route and calculate distance from start
+        for (let i = 1; i < path.length; i++) {
+          const pointDistance = google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
+          const restaurantPoint = new google.maps.LatLng(restaurant.location.lat, restaurant.location.lng);
+          
+          // Check distance to current segment
+          const distance = google.maps.geometry.spherical.computeDistanceBetween(path[i], restaurantPoint);
+          if (distance < minDistance) {
+            minDistance = distance;
+            distanceFromStart = accumulatedDistance + 
+              google.maps.geometry.spherical.computeDistanceBetween(path[i-1], restaurantPoint);
+          }
+          
+          accumulatedDistance += pointDistance;
+        }
+  
+        restaurant.distanceFromStart = distanceFromStart;
+      }
+  
+      // Calculate detour times if needed
+      if (options.considerDetour) {
+        const distanceMatrixService = new google.maps.DistanceMatrixService();
+        const BATCH_SIZE = 10;
+        
+        for (let i = 0; i < allRestaurants.length; i += BATCH_SIZE) {
+          const batch = allRestaurants.slice(i, i + BATCH_SIZE);
+          await Promise.all(
+            batch.map(async (restaurant) => {
+              try {
+                const { point } = await this.findNearestPointOnRoute(route, restaurant);
+                const detourTime = await this.calculateDetourTime(
+                  point,
+                  restaurant,
+                  distanceMatrixService
+                );
+                restaurant.detourMinutes = detourTime;
+              } catch (error) {
+                console.error(`Error calculating detour for restaurant ${restaurant.id}:`, error);
+                restaurant.detourMinutes = Infinity;
+              }
+            })
+          );
+        }
+  
+        // Filter by detour time and rating
+        allRestaurants = allRestaurants.filter(restaurant => 
+          restaurant.rating >= options.minRating &&
+          restaurant.detourMinutes <= (options.maxDetourMinutes || Infinity)
+        );
+      } else {
+        // Only filter by rating
+        allRestaurants = allRestaurants.filter(restaurant => 
+          restaurant.rating >= options.minRating
         );
       }
-
-      // Filter by detour time and rating
-      restaurants = restaurants.filter(restaurant => 
-        restaurant.rating >= options.minRating &&
-        restaurant.detourMinutes <= (options.maxDetourMinutes || Infinity)
-      );
-    } else {
-      // Only filter by rating
-      restaurants = restaurants.filter(restaurant => 
-        restaurant.rating >= options.minRating
-      );
-    }
-
-    // Calculate distances from route start for all restaurants
-    restaurants.forEach(restaurant => {
-      restaurant.distanceFromStart = this.calculateDistanceFromStart(
-        origin,
-        { lat: restaurant.location.lat, lng: restaurant.location.lng }
-      );
-    });
-
-    // Sort by distance along route
-    restaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
-
-    // Handle max stops
-    if (options.maxStops && options.maxStops > 0) {
-      const { selectedRestaurants, message } = this.selectRestaurantsBySegments(
-        restaurants,
-        options.maxStops
-      );
-      return { 
-        restaurants: selectedRestaurants,
-        message: `${message} ${options.considerDetour ? `All restaurants are within ${options.maxDetourMinutes} minutes of your route.` : ''}`
+  
+      // Sort by distance along route
+      allRestaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
+  
+      // Handle max stops if specified
+      if (options.maxStops && options.maxStops > 0) {
+        const { selectedRestaurants, message } = this.selectRestaurantsBySegments(
+          allRestaurants,
+          options.maxStops
+        );
+        return { 
+          restaurants: selectedRestaurants,
+          message: `${message} ${options.considerDetour ? `All restaurants are within ${options.maxDetourMinutes} minutes of your route.` : ''}`
+        };
+      }
+  
+      return {
+        restaurants: allRestaurants,
+        message: `Found ${allRestaurants.length} restaurants${options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of your route` : ' along your route'}.`
       };
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      throw new Error(`Failed to fetch restaurants: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return {
-      restaurants,
-      message: `Found ${restaurants.length} restaurants${options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of your route` : ' along your route'}.`
-    };
-  } catch (error) {
-    console.error('Error fetching restaurants:', error);
-    throw new Error(`Failed to fetch restaurants: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
 
   private calculateDistanceFromStart(start: Location, point: { lat: number; lng: number }): number {
     return google.maps.geometry.spherical.computeDistanceBetween(
