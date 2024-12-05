@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Restaurant } from '../../types';
+import { auth } from "../../database/firebase";
+import { historyService } from "../../services/historyService";
+import { Timestamp } from 'firebase/firestore';
 
-
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 interface Message {
@@ -36,17 +37,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
   onRouteRequest 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([{
-    text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants along your route or plan a new route. For example:\n\n- 'Find restaurants between LA and San Diego'\n- 'What are the highest-rated restaurants on my route?'\n- 'Which restaurants have outdoor seating?'",
-    isUser: false,
-    timestamp: new Date()
-  }]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const routeKey = `${origin}-${destination}`;
+  const initialMessageSent = useRef(false);
 
-  // Existing scroll and effect hooks remain the same
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -54,6 +53,50 @@ const ChatBot: React.FC<ChatBotProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize conversation when component mounts or route changes
+  useEffect(() => {
+    const initializeConversation = async () => {
+      if (initialMessageSent.current) return;
+
+      const welcomeMessage = {
+        text: "Hello! I'm your restaurant assistant. You can ask me questions about restaurants along your route or plan a new route. For example:\n\n- 'Find restaurants between LA and San Diego'\n- 'What are the highest-rated restaurants on my route?'\n- 'Which restaurants have outdoor seating?'",
+        isUser: false,
+        timestamp: new Date()
+      };
+
+      if (auth.currentUser && origin && destination) {
+        try {
+          const existingConversations = await historyService.getChatHistory(auth.currentUser.uid);
+          const currentRouteConversation = existingConversations.find(
+            conv => conv.route === `${origin} to ${destination}`
+          );
+
+          if (currentRouteConversation) {
+            const convertedMessages = currentRouteConversation.messages.map(msg => ({
+              text: msg.text,
+              isUser: msg.isUser,
+              timestamp: msg.timestamp.toDate()
+            }));
+            setMessages(convertedMessages);
+            setCurrentConversationId(currentRouteConversation.id);
+          } else {
+            setMessages([welcomeMessage]);
+            initialMessageSent.current = true;
+          }
+        } catch (error) {
+          console.error('Error initializing conversation:', error);
+          setMessages([welcomeMessage]);
+          initialMessageSent.current = true;
+        }
+      } else {
+        setMessages([welcomeMessage]);
+        initialMessageSent.current = true;
+      }
+    };
+
+    initializeConversation();
+  }, [routeKey]);
 
   const getRestaurantContext = () => {
     if (!restaurants.length) return '';
@@ -73,15 +116,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
     return JSON.stringify(restaurantInfo, null, 2);
   };
 
-  // Update these parts of your ChatBot component:
-
-const generateResponse = async (userInput: string) => {
-  try {
-    const chat = chatModel.startChat();
-    const restaurantContext = getRestaurantContext();
-    const hasExistingRoute = origin && destination;
-    
-    const prompt = `
+  const generateResponse = async (userInput: string) => {
+    try {
+      const chat = chatModel.startChat();
+      const restaurantContext = getRestaurantContext();
+      const hasExistingRoute = origin && destination;
+      
+      const prompt = `
 System: You are a restaurant assistant chatbot that can help with two types of requests:
 
 1. Questions about EXISTING restaurants:
@@ -109,130 +150,164 @@ Response Rules:
 
 Response:`;
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response.text();
-    
-    if (!response) {
-      throw new Error('Empty response received');
-    }
-    
-    return response; // Return the full response including the [ROUTE_REQUEST] if present
-  } catch (error) {
-    console.error('Error generating response:', error);
-    throw error;
-  }
-};
-
-const handleSend = async () => {
-  if (!input.trim()) return;
-
-  const userMessage: Message = {
-    text: input,
-    isUser: true,
-    timestamp: new Date(),
-  };
-  
-  setMessages(prev => [...prev, userMessage]);
-  setInput('');
-  setIsLoading(true);
-
-  try {
-    // Check if we're awaiting confirmation
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.extractedData?.needsConfirmation) {
-      handleConfirmation(input, lastMessage.extractedData);
-      setIsLoading(false);
-      return;
-    }
-
-    // Generate new response
-    const response = await generateResponse(input);
-    
-    // Extract route request if present
-    const routeRequest = extractRouteRequest(response);
-
-    if (routeRequest) {
-      // Handle new route request
-      handleRouteRequest(routeRequest);
-    } else {
-      // Handle regular response
-      // Remove any potential [ROUTE_REQUEST] tags from the response
-      const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
-      setMessages(prev => [...prev, {
-        text: cleanResponse || "I understand you're asking about restaurants. What would you like to know?",
-        isUser: false,
-        timestamp: new Date()
-      }]);
-    }
-  } catch (error) {
-    console.error('Error in chat:', error);
-    setMessages(prev => [...prev, {
-      text: "I apologize, but I'm having trouble processing your request. Please try asking your question again.",
-      isUser: false,
-      timestamp: new Date()
-    }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-const extractRouteRequest = (response: string): RouteRequest | null => {
-  const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
-  if (match) {
-    try {
-      const request = JSON.parse(match[1]);
-      // Only validate that both origin and destination are present
-      if (request.origin && request.destination) {
-        // Return the complete route request object
-        return {
-          origin: request.origin,
-          destination: request.destination,
-          stops: request.stops || null,
-          rating: request.rating || null,
-          maxDetourMinutes: request.maxDetourMinutes || null
-        };
+      const result = await chat.sendMessage(prompt);
+      const response = await result.response.text();
+      
+      if (!response) {
+        throw new Error('Empty response received');
       }
-    } catch (e) {
-      console.error('Failed to parse route request:', e);
+      
+      return response;
+    } catch (error) {
+      console.error('Error generating response:', error);
+      throw error;
     }
-  }
-  return null;
-};
+  };
 
-  const handleRouteRequest = (request: RouteRequest) => {
-    setMessages(prev => [...prev, {
-      text: `I'll help you find restaurants between ${request.origin} and ${request.destination}. Here are the details I found:
+  const extractRouteRequest = (response: string): RouteRequest | null => {
+    const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
+    if (match) {
+      try {
+        const request = JSON.parse(match[1]);
+        if (request.origin && request.destination) {
+          return {
+            origin: request.origin,
+            destination: request.destination,
+            stops: request.stops || null,
+            rating: request.rating || null,
+            maxDetourMinutes: request.maxDetourMinutes || null
+          };
+        }
+      } catch (e) {
+        console.error('Failed to parse route request:', e);
+      }
+    }
+    return null;
+  };
+
+  const createRouteRequestMessage = (request: RouteRequest): Message => ({
+    text: `I'll help you find restaurants between ${request.origin} and ${request.destination}. Here are the details I found:
 
 - Starting point: ${request.origin}
 - Destination: ${request.destination}${request.stops ? `\n- Number of stops: ${request.stops}` : ''}${request.rating ? `\n- Minimum rating: ${request.rating} stars` : ''}${request.maxDetourMinutes ? `\n- Maximum detour: ${request.maxDetourMinutes} minutes` : ''}
 
 Would you like me to search with these preferences? (Please respond with yes or no)`,
-      isUser: false,
-      timestamp: new Date(),
-      extractedData: { ...request, needsConfirmation: true }
-    }]);
-  };
+    isUser: false,
+    timestamp: new Date(),
+    extractedData: { ...request, needsConfirmation: true }
+  });
 
-  const handleConfirmation = (userInput: string, lastRequest: RouteRequest) => {
+  const handleConfirmation = async (userInput: string, lastRequest: RouteRequest): Promise<Message> => {
     const isConfirmed = userInput.toLowerCase().includes('yes');
     
+    const botMessage: Message = {
+      text: isConfirmed 
+        ? "Great! I'll search for restaurants along your route now. Once the results are in, you can ask me specific questions about the restaurants I find."
+        : "No problem! Feel free to tell me your route preferences again or ask about something else.",
+      isUser: false,
+      timestamp: new Date()
+    };
+
     if (isConfirmed && onRouteRequest) {
       onRouteRequest(lastRequest);
-      setMessages(prev => [...prev, {
-        text: "Great! I'll search for restaurants along your route now. Once the results are in, you can ask me specific questions about the restaurants I find.",
-        isUser: false,
-        timestamp: new Date()
-      }]);
-    } else {
-      setMessages(prev => [...prev, {
-        text: "No problem! Feel free to tell me your route preferences again or ask about something else.",
-        isUser: false,
-        timestamp: new Date()
-      }]);
+    }
+
+    return botMessage;
+  };
+
+  const saveConversation = async (newMessages: Message[]) => {
+    if (!auth.currentUser || !origin || !destination) return;
+
+    try {
+      if (!currentConversationId) {
+        // Create new conversation
+        const id = await historyService.saveChatSession(
+          auth.currentUser.uid,
+          newMessages.map(msg => ({
+            text: msg.text,
+            isUser: msg.isUser,
+            timestamp: Timestamp.fromDate(msg.timestamp)
+          })),
+          `${origin} to ${destination}`
+        );
+        setCurrentConversationId(id);
+      } else {
+        // Update existing conversation
+        await historyService.updateChatSession(
+          currentConversationId,
+          newMessages.map(msg => ({
+            text: msg.text,
+            isUser: msg.isUser,
+            timestamp: Timestamp.fromDate(msg.timestamp)
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
     }
   };
 
-  // Rest of the component remains the same (UI rendering code)
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      text: input,
+      isUser: true,
+      timestamp: new Date()
+    };
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      // Check if we're awaiting confirmation from a previous route request
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.extractedData?.needsConfirmation) {
+        const botResponse = await handleConfirmation(input, lastMessage.extractedData);
+        const finalMessages = [...updatedMessages, botResponse];
+        setMessages(finalMessages);
+        await saveConversation(finalMessages);
+        setIsLoading(false);
+        return;
+      }
+
+      // Generate new response
+      const response = await generateResponse(input);
+      const routeRequest = extractRouteRequest(response);
+      
+      let botMessage: Message;
+      if (routeRequest) {
+        botMessage = createRouteRequestMessage(routeRequest);
+      } else {
+        const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
+        botMessage = {
+          text: cleanResponse || "I understand you're asking about restaurants. What would you like to know?",
+          isUser: false,
+          timestamp: new Date()
+        };
+      }
+
+      const finalMessages = [...updatedMessages, botMessage];
+      setMessages(finalMessages);
+      await saveConversation(finalMessages);
+
+    } catch (error) {
+      console.error('Error in chat:', error);
+      const errorMessage: Message = {
+        text: "I apologize, but I'm having trouble processing your request. Please try asking your question again.",
+        isUser: false,
+        timestamp: new Date()
+      };
+      const finalMessages = [...updatedMessages, errorMessage];
+      setMessages(finalMessages);
+      await saveConversation(finalMessages);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
