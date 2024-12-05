@@ -168,9 +168,9 @@ const RouteCard = forwardRef<RouteCardRef, RouteCardProps>(({ onSubmit }, ref) =
                   <div className="flex items-center gap-2">
                     <input
                       type="range"
-                      min="5"
+                      min="1"
                       max="30"
-                      step="5"
+                      step="1"
                       value={maxDetourMinutes}
                       onChange={(e) => setMaxDetourMinutes(Number(e.target.value))}
                       className="flex-1"
