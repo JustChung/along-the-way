@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Restaurant } from '../../types';
-
+import { auth } from "../../database/firebase";
+import { historyService } from "../../services/historyService";
+import { Timestamp } from 'firebase/firestore';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -46,7 +48,24 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatModel = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-  // Existing scroll and effect hooks remain the same
+  const saveChatMessage = async (message: Message) => {
+    if (auth.currentUser && origin && destination) {
+      try {
+        await historyService.saveChatSession(
+          auth.currentUser.uid,
+          [{
+            text: message.text,
+            isUser: message.isUser,
+            timestamp: Timestamp.fromDate(message.timestamp)
+          }],
+          `${origin} to ${destination}`
+        );
+      } catch (error) {
+        console.error('Error saving chat message:', error);
+      }
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -73,15 +92,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
     return JSON.stringify(restaurantInfo, null, 2);
   };
 
-  // Update these parts of your ChatBot component:
-
-const generateResponse = async (userInput: string) => {
-  try {
-    const chat = chatModel.startChat();
-    const restaurantContext = getRestaurantContext();
-    const hasExistingRoute = origin && destination;
-    
-    const prompt = `
+  const generateResponse = async (userInput: string) => {
+    try {
+      const chat = chatModel.startChat();
+      const restaurantContext = getRestaurantContext();
+      const hasExistingRoute = origin && destination;
+      
+      const prompt = `
 System: You are a restaurant assistant chatbot that can help with two types of requests:
 
 1. Questions about EXISTING restaurants:
@@ -109,95 +126,40 @@ Response Rules:
 
 Response:`;
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response.text();
-    
-    if (!response) {
-      throw new Error('Empty response received');
-    }
-    
-    return response; // Return the full response including the [ROUTE_REQUEST] if present
-  } catch (error) {
-    console.error('Error generating response:', error);
-    throw error;
-  }
-};
-
-const handleSend = async () => {
-  if (!input.trim()) return;
-
-  const userMessage: Message = {
-    text: input,
-    isUser: true,
-    timestamp: new Date(),
-  };
-  
-  setMessages(prev => [...prev, userMessage]);
-  setInput('');
-  setIsLoading(true);
-
-  try {
-    // Check if we're awaiting confirmation
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.extractedData?.needsConfirmation) {
-      handleConfirmation(input, lastMessage.extractedData);
-      setIsLoading(false);
-      return;
-    }
-
-    // Generate new response
-    const response = await generateResponse(input);
-    
-    // Extract route request if present
-    const routeRequest = extractRouteRequest(response);
-
-    if (routeRequest) {
-      // Handle new route request
-      handleRouteRequest(routeRequest);
-    } else {
-      // Handle regular response
-      // Remove any potential [ROUTE_REQUEST] tags from the response
-      const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
-      setMessages(prev => [...prev, {
-        text: cleanResponse || "I understand you're asking about restaurants. What would you like to know?",
-        isUser: false,
-        timestamp: new Date()
-      }]);
-    }
-  } catch (error) {
-    console.error('Error in chat:', error);
-    setMessages(prev => [...prev, {
-      text: "I apologize, but I'm having trouble processing your request. Please try asking your question again.",
-      isUser: false,
-      timestamp: new Date()
-    }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-const extractRouteRequest = (response: string): RouteRequest | null => {
-  const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
-  if (match) {
-    try {
-      const request = JSON.parse(match[1]);
-      // Only validate that both origin and destination are present
-      if (request.origin && request.destination) {
-        // Return the complete route request object
-        return {
-          origin: request.origin,
-          destination: request.destination,
-          stops: request.stops || null,
-          rating: request.rating || null,
-          maxDetourMinutes: request.maxDetourMinutes || null
-        };
+      const result = await chat.sendMessage(prompt);
+      const response = await result.response.text();
+      
+      if (!response) {
+        throw new Error('Empty response received');
       }
-    } catch (e) {
-      console.error('Failed to parse route request:', e);
+      
+      return response;
+    } catch (error) {
+      console.error('Error generating response:', error);
+      throw error;
     }
-  }
-  return null;
-};
+  };
+
+  const extractRouteRequest = (response: string): RouteRequest | null => {
+    const match = response.match(/\[ROUTE_REQUEST\](.*?)\[\/ROUTE_REQUEST\]/s);
+    if (match) {
+      try {
+        const request = JSON.parse(match[1]);
+        if (request.origin && request.destination) {
+          return {
+            origin: request.origin,
+            destination: request.destination,
+            stops: request.stops || null,
+            rating: request.rating || null,
+            maxDetourMinutes: request.maxDetourMinutes || null
+          };
+        }
+      } catch (e) {
+        console.error('Failed to parse route request:', e);
+      }
+    }
+    return null;
+  };
 
   const handleRouteRequest = (request: RouteRequest) => {
     setMessages(prev => [...prev, {
@@ -232,7 +194,63 @@ Would you like me to search with these preferences? (Please respond with yes or 
     }
   };
 
-  // Rest of the component remains the same (UI rendering code)
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = {
+      text: input,
+      isUser: true,
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    // Save user message
+    await saveChatMessage(userMessage);
+
+    try {
+      // Check if we're awaiting confirmation
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.extractedData?.needsConfirmation) {
+        handleConfirmation(input, lastMessage.extractedData);
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await generateResponse(input);
+      
+      // Extract route request if present
+      const routeRequest = extractRouteRequest(response);
+
+      if (routeRequest) {
+        handleRouteRequest(routeRequest);
+      } else {
+        // Handle regular response
+        const cleanResponse = response.replace(/\[ROUTE_REQUEST\].*?\[\/ROUTE_REQUEST\]/s, '').trim();
+        const botMessage: Message = {
+          text: cleanResponse || "I understand you're asking about restaurants. What would you like to know?",
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+        await saveChatMessage(botMessage);
+      }
+    } catch (error) {
+      console.error('Error in chat:', error);
+      const errorMessage: Message = {
+        text: "I apologize, but I'm having trouble processing your request. Please try asking your question again.",
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      await saveChatMessage(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };

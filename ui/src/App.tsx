@@ -13,6 +13,8 @@ import RouteCard from "./components/RouteCard/RouteCard";
 import { AccountPage } from "./components/Accounts/AccountPage";
 import { SavedRoutes } from "./components/Map/SavedRoutes";
 import { ChatHistory } from "./components/ChatBot/ChatHistory";
+import { historyService } from "./services/historyService";
+import { auth } from "./database/firebase";
 
 interface RouteSubmitData {
   origin: string;
@@ -81,6 +83,36 @@ const App: React.FC = () => {
       );
 
       setRestaurants(result.restaurants);
+
+      if (result.restaurants.length > 0 && auth.currentUser) {
+        try {
+          // Log the data being sent to saveRoute
+          console.log('Sending to saveRoute:', {
+            origin: originLocation,
+            destination: destLocation,
+            restaurants: result.restaurants,
+            preferences: {
+              maxDetourMinutes: data.maxDetourMinutes,
+              stops: data.stops,
+              rating: data.rating
+            }
+          });
+      
+          await historyService.saveRoute(auth.currentUser.uid, {
+            origin: originLocation,
+            destination: destLocation,
+            restaurants: result.restaurants,
+            preferences: {
+              maxDetourMinutes: data.maxDetourMinutes,
+              stops: data.stops,
+              rating: data.rating
+            }
+          });
+        } catch (error) {
+          console.error('Error saving route:', error);
+          // Don't show this error to user since it's not critical
+        }
+      }
 
       if (result.restaurants.length === 0) {
         setError(
