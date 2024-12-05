@@ -3,10 +3,38 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../../database/firebase";
 import { historyService } from "../../services/historyService";
 import { format } from "date-fns";
+import { Timestamp } from 'firebase/firestore';
 
 // Route card component for better organization
 const RouteCard = ({ route, onLoadRoute }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Add a safe timestamp formatting function
+  const formatTimestamp = (timestamp: any) => {
+    try {
+      // If it's already a Date object
+      if (timestamp instanceof Date) {
+        return format(timestamp, 'MMM d, yyyy h:mm a');
+      }
+      // If it's a Firestore Timestamp
+      if (timestamp?.toDate) {
+        return format(timestamp.toDate(), 'MMM d, yyyy h:mm a');
+      }
+      // If it's a number (unix timestamp)
+      if (typeof timestamp === 'number') {
+        return format(new Date(timestamp), 'MMM d, yyyy h:mm a');
+      }
+      // If it's an ISO string
+      if (typeof timestamp === 'string') {
+        return format(new Date(timestamp), 'MMM d, yyyy h:mm a');
+      }
+      // Fallback
+      return 'Invalid date';
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return 'Invalid date';
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 transition-all duration-300 hover:shadow-lg">
@@ -16,7 +44,7 @@ const RouteCard = ({ route, onLoadRoute }) => {
             {route.origin.address} → {route.destination.address}
           </h2>
           <p className="text-gray-600 text-sm">
-            {format(route.timestamp.toDate(), 'MMM d, yyyy h:mm a')}
+            {formatTimestamp(route.timestamp)}
           </p>
           <p className="text-gray-600 text-sm">
             {route.stops.length} stops • Min rating: {route.preferences.minRating}★
@@ -50,14 +78,8 @@ const RouteCard = ({ route, onLoadRoute }) => {
                   {index + 1}
                 </span>
                 <div>
-                  <p className="font-medium line-clamp-1">
-                    {typeof stop.name === 'object' ? stop.name.text : stop.name}
-                  </p>
-                  <p className="text-sm text-gray-600 line-clamp-1">
-                    {typeof stop.location.address === 'object' 
-                      ? stop.location.address.text 
-                      : stop.location.address}
-                  </p>
+                  <p className="font-medium line-clamp-1">{stop.name}</p>
+                  <p className="text-sm text-gray-600 line-clamp-1">{stop.location.address}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm text-yellow-600">{stop.rating}★</span>
                     {stop.detourMinutes > 0 && (

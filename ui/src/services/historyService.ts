@@ -34,7 +34,41 @@ interface ChatSession {
 }
 
 class HistoryService {
-  // Save a route
+  // Helper function to clean any value
+  private cleanValue(value: any): any {
+    // Handle null
+    if (value === null) {
+      return null;
+    }
+
+    // Handle undefined
+    if (value === undefined) {
+      return null;
+    }
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value
+        .map(item => this.cleanValue(item))
+        .filter(item => item !== null && item !== undefined);
+    }
+
+    // Handle objects
+    if (typeof value === 'object' && value !== null) {
+      const cleaned: { [key: string]: any } = {};
+      for (const [key, val] of Object.entries(value)) {
+        const cleanedVal = this.cleanValue(val);
+        if (cleanedVal !== null && cleanedVal !== undefined) {
+          cleaned[key] = cleanedVal;
+        }
+      }
+      return cleaned;
+    }
+
+    // Return primitive values as is
+    return value;
+  }
+
   async saveRoute(userId: string, routeData: {
     origin: Location;
     destination: Location;
@@ -46,75 +80,87 @@ class HistoryService {
     };
   }): Promise<string> {
     try {
+      // Helper function to clean facility data
+      const cleanFacilities = (facilities?: {[key: string]: boolean | undefined}) => {
+        if (!facilities) return {};
+        
+        const cleaned: {[key: string]: boolean} = {};
+        for (const [key, value] of Object.entries(facilities)) {
+          if (typeof value === 'boolean') {
+            cleaned[key] = value;
+          }
+        }
+        return cleaned;
+      };
+
       // Helper function to clean restaurant data
       const cleanRestaurant = (restaurant: Restaurant) => {
         const getName = (name: string | { text: string }) => 
-          typeof name === 'object' ? name.text : name;
+          typeof name === 'object' && name !== null ? name.text : name;
   
         const getAddress = (address: string | { text: string }) =>
-          typeof address === 'object' ? address.text : address;
-  
-        return {
-          id: restaurant.id,
-          name: getName(restaurant.name),
+          typeof address === 'object' && address !== null ? address.text : address;
+        
+        const cleanedRestaurant = {
+          id: restaurant.id || '',
+          name: getName(restaurant.name) || '',
           location: {
-            lat: restaurant.location.lat,
-            lng: restaurant.location.lng,
-            address: getAddress(restaurant.location.address)
+            lat: restaurant.location?.lat || 0,
+            lng: restaurant.location?.lng || 0,
+            address: getAddress(restaurant.location?.address) || ''
           },
           rating: restaurant.rating || 0,
           userRatingCount: restaurant.userRatingCount || 0,
           priceLevel: restaurant.priceLevel || 0,
-          photos: restaurant.photos?.map(photo => ({
-            name: photo.name,
-            width: photo.widthPx,
-            height: photo.heightPx
-          })) || [],
-          reviews: restaurant.reviews?.map(review => ({
-            rating: review.rating,
-            text: typeof review.text === 'object' ? review.text.text : review.text,
-            authorName: review.authorAttribution?.displayName || 'Anonymous',
-            publishTime: review.publishTime || '',
-            relativeTime: review.relativePublishTimeDescription || ''
-          })) || [],
+          photos: (restaurant.photos || []).map(photo => ({
+            name: photo?.name || '',
+            width: photo?.widthPx || 0,
+            height: photo?.heightPx || 0
+          })),
+          reviews: (restaurant.reviews || []).map(review => ({
+            rating: review?.rating || 0,
+            text: typeof review?.text === 'object' ? review.text.text || '' : review?.text || '',
+            authorName: review?.authorAttribution?.displayName || 'Anonymous',
+            publishTime: review?.publishTime || '',
+            relativeTime: review?.relativePublishTimeDescription || ''
+          })),
           phoneNumber: restaurant.phoneNumber || '',
           websiteUri: restaurant.websiteUri || '',
           isOpenNow: restaurant.regularOpeningHours?.openNow || false,
-          facilities: {
-            outdoorSeating: restaurant.facilities?.outdoorSeating || false,
-            reservable: restaurant.facilities?.reservable || false,
-            wheelchairAccessible: restaurant.facilities?.wheelchairAccessible || false,
-            delivery: restaurant.facilities?.delivery || false,
-            dineIn: restaurant.facilities?.dineIn || false,
-            takeout: restaurant.facilities?.takeout || false
-          },
+          facilities: cleanFacilities(restaurant.facilities),
           distanceFromStart: restaurant.distanceFromStart || 0,
           detourMinutes: restaurant.detourMinutes || 0
         };
+
+        // Deep clean the entire restaurant object
+        return this.cleanValue(cleanedRestaurant);
       };
   
       const cleanedData = {
-        userId,
+        userId: userId || '',
         origin: {
-          lat: routeData.origin.lat,
-          lng: routeData.origin.lng,
-          address: routeData.origin.address
+          lat: routeData.origin?.lat || 0,
+          lng: routeData.origin?.lng || 0,
+          address: routeData.origin?.address || ''
         },
         destination: {
-          lat: routeData.destination.lat,
-          lng: routeData.destination.lng,
-          address: routeData.destination.address
+          lat: routeData.destination?.lat || 0,
+          lng: routeData.destination?.lng || 0,
+          address: routeData.destination?.address || ''
         },
-        stops: routeData.restaurants.map(cleanRestaurant),
+        stops: (routeData.restaurants || []).map(cleanRestaurant),
         timestamp: Timestamp.now(),
         preferences: {
-          maxDetourMinutes: routeData.preferences.maxDetourMinutes || null,
-          numberOfStops: routeData.preferences.stops || null,
-          minRating: routeData.preferences.rating || 0
+          maxDetourMinutes: routeData.preferences?.maxDetourMinutes ?? null,
+          numberOfStops: routeData.preferences?.stops ?? null,
+          minRating: routeData.preferences?.rating || 0
         }
       };
+
+      // Final deep clean of the entire object
+      const finalCleanedData = this.cleanValue(cleanedData);
   
-      const routeRef = await addDoc(collection(db, 'routes'), cleanedData);
+      const routeRef = await addDoc(collection(db, 'routes'), finalCleanedData);
       return routeRef.id;
     } catch (error) {
       console.error('Error saving route:', error);
@@ -122,7 +168,6 @@ class HistoryService {
     }
   }
 
-  // Get user's saved routes
   async getUserRoutes(userId: string): Promise<SavedRoute[]> {
     try {
       const routesQuery = query(
@@ -132,17 +177,23 @@ class HistoryService {
       );
       
       const querySnapshot = await getDocs(routesQuery);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as SavedRoute));
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Ensure timestamp is a Firestore Timestamp
+          timestamp: data.timestamp instanceof Timestamp ? 
+            data.timestamp : 
+            Timestamp.fromDate(new Date(data.timestamp))
+        } as SavedRoute;
+      });
     } catch (error) {
       console.error('Error fetching routes:', error);
       throw new Error('Failed to fetch routes');
     }
   }
 
-  // Save a chat session
   async saveChatSession(userId: string, messages: ChatMessage[], routeDescription: string): Promise<string> {
     try {
       const chatRef = await addDoc(collection(db, 'chatSessions'), {
@@ -159,7 +210,6 @@ class HistoryService {
     }
   }
 
-  // Update an existing chat session
   async updateChatSession(sessionId: string, messages: ChatMessage[]): Promise<void> {
     try {
       const chatRef = doc(db, 'chatSessions', sessionId);
@@ -173,7 +223,6 @@ class HistoryService {
     }
   }
 
-  // Get user's chat history
   async getChatHistory(userId: string): Promise<ChatSession[]> {
     try {
       const chatQuery = query(
