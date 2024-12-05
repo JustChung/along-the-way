@@ -1,5 +1,5 @@
 // src/services/historyService.ts
-import { collection, addDoc, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '../database/firebase';
 import { Location, Restaurant } from '../types';
 
@@ -30,13 +30,12 @@ interface ChatSession {
   messages: ChatMessage[];
   startTime: Timestamp;
   endTime: Timestamp;
+  route: string;
 }
 
 class HistoryService {
   // Save a route
-  // In historyService.ts
-// In historyService.ts
-async saveRoute(userId: string, routeData: {
+  async saveRoute(userId: string, routeData: {
     origin: Location;
     destination: Location;
     restaurants: Restaurant[];
@@ -49,14 +48,12 @@ async saveRoute(userId: string, routeData: {
     try {
       // Helper function to clean restaurant data
       const cleanRestaurant = (restaurant: Restaurant) => {
-        // Extract text from LocalizedText objects
         const getName = (name: string | { text: string }) => 
           typeof name === 'object' ? name.text : name;
   
         const getAddress = (address: string | { text: string }) =>
           typeof address === 'object' ? address.text : address;
   
-        // Clean and flatten the restaurant structure
         return {
           id: restaurant.id,
           name: getName(restaurant.name),
@@ -68,13 +65,11 @@ async saveRoute(userId: string, routeData: {
           rating: restaurant.rating || 0,
           userRatingCount: restaurant.userRatingCount || 0,
           priceLevel: restaurant.priceLevel || 0,
-          // Only include essential photo data
           photos: restaurant.photos?.map(photo => ({
             name: photo.name,
             width: photo.widthPx,
             height: photo.heightPx
           })) || [],
-          // Clean reviews to only include essential data
           reviews: restaurant.reviews?.map(review => ({
             rating: review.rating,
             text: typeof review.text === 'object' ? review.text.text : review.text,
@@ -84,9 +79,7 @@ async saveRoute(userId: string, routeData: {
           })) || [],
           phoneNumber: restaurant.phoneNumber || '',
           websiteUri: restaurant.websiteUri || '',
-          // Simplify opening hours
           isOpenNow: restaurant.regularOpeningHours?.openNow || false,
-          // Simplify facilities to boolean values only
           facilities: {
             outdoorSeating: restaurant.facilities?.outdoorSeating || false,
             reservable: restaurant.facilities?.reservable || false,
@@ -125,7 +118,6 @@ async saveRoute(userId: string, routeData: {
       return routeRef.id;
     } catch (error) {
       console.error('Error saving route:', error);
-      console.error('Full error details:', JSON.stringify(error, null, 2));
       throw new Error('Failed to save route');
     }
   }
@@ -151,12 +143,12 @@ async saveRoute(userId: string, routeData: {
   }
 
   // Save a chat session
-  async saveChatSession(userId: string, messages: ChatMessage[], routeId?: string): Promise<string> {
+  async saveChatSession(userId: string, messages: ChatMessage[], routeDescription: string): Promise<string> {
     try {
       const chatRef = await addDoc(collection(db, 'chatSessions'), {
         userId,
-        routeId,
         messages,
+        route: routeDescription,
         startTime: messages[0]?.timestamp || Timestamp.now(),
         endTime: Timestamp.now()
       });
@@ -164,6 +156,20 @@ async saveRoute(userId: string, routeData: {
     } catch (error) {
       console.error('Error saving chat session:', error);
       throw new Error('Failed to save chat session');
+    }
+  }
+
+  // Update an existing chat session
+  async updateChatSession(sessionId: string, messages: ChatMessage[]): Promise<void> {
+    try {
+      const chatRef = doc(db, 'chatSessions', sessionId);
+      await updateDoc(chatRef, {
+        messages,
+        endTime: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error updating chat session:', error);
+      throw new Error('Failed to update chat session');
     }
   }
 
@@ -189,4 +195,3 @@ async saveRoute(userId: string, routeData: {
 }
 
 export const historyService = new HistoryService();
-
