@@ -193,24 +193,35 @@ class MapService {
       for (let i = 1; i < path.length; i++) {
         totalDistance += google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
       }
-  
-      // Dynamically determine number of segments based on route length
-      // For routes under 5km (≈3 miles), use single segment
-      // For longer routes, create a segment every 5km, with a minimum of 2 segments
-      const MIN_SEGMENT_LENGTH = 5000; // 5km in meters
-      const numberOfSegments = Math.max(2, Math.ceil(totalDistance / MIN_SEGMENT_LENGTH));
-      const SEGMENT_LENGTH = totalDistance / numberOfSegments;
+
+      // Dynamic segmentation based on route length
+      let numberOfSegments: number;
+      if (totalDistance <= 10000) { // Under 10km
+        numberOfSegments = 2;
+      } else if (totalDistance <= 50000) { // 10-50km
+        numberOfSegments = 5;
+      } else if (totalDistance <= 100000) { // 50-100km
+        numberOfSegments = 8;
+      } else if (totalDistance <= 200000) { // 100-200km
+        numberOfSegments = 12;
+      } else { // Over 200km
+        numberOfSegments = 15;
+      }
+
+      const segmentLength = totalDistance / numberOfSegments;
+      
+      console.log(`Route distance: ${(totalDistance/1000).toFixed(1)}km`);
+      console.log(`Number of segments: ${numberOfSegments}`);
+      console.log(`Segment length: ${(segmentLength/1000).toFixed(1)}km`);
       
       let allRestaurants: Restaurant[] = [];
+      let segmentStats: { start: number; end: number; count: number }[] = [];
       
       // Process route in segments
       for (let segmentIndex = 0; segmentIndex < numberOfSegments; segmentIndex++) {
-        // Create overlapping segments to avoid gaps
-        const segmentStartDistance = segmentIndex * SEGMENT_LENGTH * 0.8; // 20% overlap with previous segment
-        const segmentEndDistance = Math.min(
-          (segmentIndex + 1) * SEGMENT_LENGTH * 1.2, // 20% overlap with next segment
-          totalDistance
-        );
+        // Use linear segmentation without overlap
+        const segmentStartDistance = segmentIndex * segmentLength;
+        const segmentEndDistance = Math.min((segmentIndex + 1) * segmentLength, totalDistance);
         
         let currentDistance = 0;
         let segmentPath: google.maps.LatLng[] = [];
@@ -221,10 +232,8 @@ class MapService {
           const pointDistance = google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
           const newDistance = currentDistance + pointDistance;
   
-          // Add points within segment bounds
           if (currentDistance <= segmentEndDistance) {
             if (currentDistance >= segmentStartDistance && !startPointFound) {
-              // Add start point (interpolated)
               const ratio = (segmentStartDistance - currentDistance) / pointDistance;
               const startPoint = google.maps.geometry.spherical.interpolate(path[i-1], path[i], ratio);
               segmentPath.push(startPoint);
@@ -237,7 +246,6 @@ class MapService {
           }
   
           if (newDistance > segmentEndDistance) {
-            // Add end point (interpolated)
             const ratio = (segmentEndDistance - currentDistance) / pointDistance;
             const endPoint = google.maps.geometry.spherical.interpolate(path[i-1], path[i], ratio);
             segmentPath.push(endPoint);
@@ -247,19 +255,15 @@ class MapService {
           currentDistance = newDistance;
         }
   
-        // Ensure segment has at least two points
-        if (segmentPath.length < 2) {
-          continue;
-        }
-  
-        // Encode segment path
+        if (segmentPath.length < 2) continue;
+
         const encodedPath = google.maps.geometry.encoding.encodePath(segmentPath);
+        
+        // Request equal number of results per segment
+        const segmentMaxResults = Math.min(30, Math.ceil(50 / numberOfSegments));
+
+        console.log(`Segment ${segmentIndex + 1}: ${(segmentStartDistance/1000).toFixed(1)}km to ${(segmentEndDistance/1000).toFixed(1)}km`);
   
-        // Calculate max results for this segment based on its proportion of the total route
-        const segmentLength = Math.abs(segmentEndDistance - segmentStartDistance);
-        const segmentMaxResults = Math.ceil((segmentLength / totalDistance) * 50);
-  
-        // Search for restaurants along this segment
         const response = await axios.post(
           `${this.placesApiBaseUrl}:searchText`,
           {
@@ -282,7 +286,6 @@ class MapService {
         );
   
         if (response.data.places) {
-          // Process restaurants from this segment
           const segmentRestaurants = response.data.places.map((place: any) => ({
             id: place.id,
             name: place.displayName,
@@ -333,18 +336,34 @@ class MapService {
           }));
   
           allRestaurants = allRestaurants.concat(segmentRestaurants);
+          
+          segmentStats.push({
+            start: segmentStartDistance,
+            end: segmentEndDistance,
+            count: segmentRestaurants.length
+          });
+          
+          console.log(`Found ${segmentRestaurants.length} restaurants in segment ${segmentIndex + 1}`);
         }
       }
+
+      // Log segment statistics
+      console.log('Segment Statistics:');
+      segmentStats.forEach((stat, index) => {
+        console.log(`Segment ${index + 1}: ${stat.count} restaurants (${(stat.start/1000).toFixed(1)}km - ${(stat.end/1000).toFixed(1)}km)`);
+      });
   
-      // Remove duplicates using Map
+      // Remove duplicates
+      const beforeDedup = allRestaurants.length;
       allRestaurants = Array.from(new Map(allRestaurants.map(r => [r.id, r])).values());
-  
+      console.log(`Removed ${beforeDedup - allRestaurants.length} duplicate restaurants`);
+
       // Calculate accurate distances from route start for all restaurants
       for (const restaurant of allRestaurants) {
         let minDistance = Infinity;
         let distanceFromStart = 0;
         let accumulatedDistance = 0;
-  
+
         // Find closest point on route and calculate distance from start
         for (let i = 1; i < path.length; i++) {
           const pointDistance = google.maps.geometry.spherical.computeDistanceBetween(path[i-1], path[i]);
@@ -360,14 +379,13 @@ class MapService {
           
           accumulatedDistance += pointDistance;
         }
-  
+
         restaurant.distanceFromStart = distanceFromStart;
       }
-  
-      // Calculate detour times if needed
+
       if (options.considerDetour) {
         const distanceMatrixService = new google.maps.DistanceMatrixService();
-        const BATCH_SIZE = 10;
+        const BATCH_SIZE = 5; // Reduced batch size
         
         for (let i = 0; i < allRestaurants.length; i += BATCH_SIZE) {
           const batch = allRestaurants.slice(i, i + BATCH_SIZE);
@@ -388,37 +406,62 @@ class MapService {
             })
           );
         }
-  
-        // Filter by detour time and rating
+
         allRestaurants = allRestaurants.filter(restaurant => 
           restaurant.rating >= options.minRating &&
           restaurant.detourMinutes <= (options.maxDetourMinutes || Infinity)
         );
       } else {
-        // Only filter by rating
         allRestaurants = allRestaurants.filter(restaurant => 
           restaurant.rating >= options.minRating
         );
       }
-  
-      // Sort by distance along route
-      allRestaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
-  
-      // Handle max stops if specified
-      if (options.maxStops && options.maxStops > 0) {
-        const { selectedRestaurants, message } = this.selectRestaurantsBySegments(
-          allRestaurants,
-          options.maxStops
-        );
-        return { 
-          restaurants: selectedRestaurants,
-          message: `${message} ${options.considerDetour ? `All restaurants are within ${options.maxDetourMinutes} minutes of your route.` : ''}`
-        };
+
+      // When selecting final restaurants, ensure even distribution
+      if (allRestaurants.length > 30) {
+        // Divide route into 6 sections for final distribution
+        const finalSections = 6;
+        const sectionLength = totalDistance / finalSections;
+        const selectedRestaurants: Restaurant[] = [];
+        
+        for (let i = 0; i < finalSections; i++) {
+          const sectionStart = i * sectionLength;
+          const sectionEnd = (i + 1) * sectionLength;
+          
+          // Get restaurants in this section
+          const sectionRestaurants = allRestaurants.filter(r => 
+            r.distanceFromStart >= sectionStart && r.distanceFromStart < sectionEnd
+          );
+          
+          // Sort by rating and take top 5 from each section
+          sectionRestaurants.sort((a, b) => {
+            if (b.rating !== a.rating) return b.rating - a.rating;
+            return b.userRatingCount - a.userRatingCount;
+          });
+          
+          selectedRestaurants.push(...sectionRestaurants.slice(0, 5));
+        }
+        
+        allRestaurants = selectedRestaurants.slice(0, 30);
+        console.log('Final restaurant distribution:');
+        for (let i = 0; i < finalSections; i++) {
+          const sectionStart = i * sectionLength;
+          const sectionEnd = (i + 1) * sectionLength;
+          const count = allRestaurants.filter(r => 
+            r.distanceFromStart >= sectionStart && r.distanceFromStart < sectionEnd
+          ).length;
+          console.log(`Section ${i + 1}: ${count} restaurants (${(sectionStart/1000).toFixed(1)}km - ${(sectionEnd/1000).toFixed(1)}km)`);
+        }
       }
-  
+
+      // Final sort by distance
+      allRestaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
+
       return {
         restaurants: allRestaurants,
-        message: `Found ${allRestaurants.length} restaurants${options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of your route` : ' along your route'}.`
+        message: `Found ${allRestaurants.length} highly-rated restaurants${
+          options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of` : ' along'
+        } your route.`
       };
     } catch (error) {
       console.error('Error fetching restaurants:', error);
