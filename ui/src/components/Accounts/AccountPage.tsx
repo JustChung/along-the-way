@@ -27,10 +27,10 @@ export function AccountPage() {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center">
-          <h2>Please log in to view this page.</h2>
+        <h2 className="text-xl mb-4">Please log in to view your account</h2>
           <button
             onClick={() => navigate("/login")}
-            className="mt-4 bg-blue-500 text-white py-2 px-4 rounded"
+            className="bg-blue-500 text-white py-2 px-6 rounded hover:bg-blue-600 transition-colors"
           >
             Go to Login
           </button>
