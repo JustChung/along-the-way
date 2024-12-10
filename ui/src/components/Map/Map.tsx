@@ -4,6 +4,7 @@ import { Location, Restaurant } from '../../types';
 import { ClockIcon } from '@heroicons/react/24/solid';
 import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { reviewAggregator } from '../../services/reviews';
 
 const getTextContent = (text: string | { text: string } | any): string => {
   if (typeof text === 'string') return text;
@@ -16,6 +17,9 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
   const [imageError, setImageError] = useState(false);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const [reviews, setReviews] = useState<string[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [enabledSources, setEnabledSources] = useState<string[]>([]);
 
   useEffect(() => {
     const loadImage = async () => {
@@ -38,6 +42,25 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
     loadImage();
     setShowReviews(false);
   }, [restaurant]);
+
+  useEffect(() => {
+    const loadReviews = async () => {
+      if (!showReviews) return;
+      
+      setLoadingReviews(true);
+      try {
+        const aggregatedReviews = await reviewAggregator.getAggregatedReviews(restaurant);
+        setReviews(aggregatedReviews);
+        setEnabledSources(reviewAggregator.getEnabledSources());
+      } catch (error) {
+        console.error('Error loading reviews:', error);
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+  
+    loadReviews();
+  }, [restaurant, showReviews]);
 
   const handleToggleReviews = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,25 +176,43 @@ const InfoWindowContent: React.FC<{ restaurant: Restaurant }> = ({ restaurant })
         </button>
       )}
 
-      {showReviews && restaurant.reviews && (
+      {showReviews && (
         <div className="mt-2 space-y-3 max-h-48 overflow-y-auto">
-          {restaurant.reviews.map((review, index) => (
-            <div key={index} className="bg-gray-50 p-2 rounded">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-sm">
-                  {review.authorAttribution?.displayName || 'Anonymous'}
-                </span>
-                <div className="flex items-center">
-                  <span className="text-sm text-yellow-600">{review.rating}</span>
-                  <span className="text-yellow-400 ml-1">★</span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600">{getTextContent(review.text)}</p>
-              <span className="text-xs text-gray-400 block mt-1">
-                {review.relativePublishTimeDescription}
-              </span>
+          {loadingReviews ? (
+            <div className="flex justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
-          ))}
+          ) : reviews.length > 0 ? (
+            <>
+              <div className="flex gap-2 mb-2">
+                {enabledSources.map(source => (
+                  <span key={source} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                    {source}
+                  </span>
+                ))}
+              </div>
+              {reviews.map((review) => (
+                <div key={review.id} className="bg-gray-50 p-2 rounded">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-sm">{review.authorName}</span>
+                    <div className="flex items-center">
+                      <span className="text-sm text-yellow-600">{review.rating}</span>
+                      <span className="text-yellow-400 ml-1">★</span>
+                    </div>
+                    <span className="text-xs px-1 rounded bg-gray-200">
+                      {review.source}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">{review.text}</p>
+                  <span className="text-xs text-gray-400 block mt-1">
+                    {review.relativeTime}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 text-center">No reviews available</p>
+          )}
         </div>
       )}
 
