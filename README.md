@@ -76,7 +76,7 @@ Select all of the following APIs and enable them for your project.
 
 # Demo Screenshots
 ## Main App (Before using it)
-![Main App](https://i.ibb.co/2nsmnNH/image.png)
+![Main App](https://i.ibb.co/87jy31f/image.png)
 
 # User Authentication
 Login Page, Signup Page, Successful Login animation)
