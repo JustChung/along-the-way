@@ -27,8 +27,10 @@ Business Analyst/QA: Michael L.
 - GOOGLE_MAPS_API_KEY
 - Google Firebase secrets
 
+Note: Some API keys may expire after the free trial or have limits.
+
 In Google Cloud Console: Create a new project:
-Select the following APIs and enable them for your project.
+Select all of the following APIs and enable them for your project.
 - Directions API
 - Places API (NEW)
 - Places API
@@ -67,7 +69,7 @@ Select the following APIs and enable them for your project.
     VITE_YELP_API_KEY=YOUR_YELP_API_KEY 
     ```
 4. Ensure that your Firebase project is set up correctly for a web app. Enable user authentication and cloud firestore.
-5. Run the development server. App will run on local host ie: http://localhost:5173/
+5. Run the development server. The app will run on a local host in your web browser ie: http://localhost:5173/
     ```bash
     npm run dev
     ```
@@ -82,13 +84,13 @@ Login Page, Signup Page, Successful Login animation)
 ![Signup Page](https://github.com/user-attachments/assets/876d37d7-b9eb-488e-bb6e-b742c5fd0485)
 ![Successful Login](https://github.com/user-attachments/assets/6cf35726-7478-4f62-92ce-64f10c1a4fb3)
 
-## Main App (Search route with no filters on. And Chatbot conversation example.)
+## Main App (Search route with no filters on, as well as a Chatbot conversation example.)
 ![No Filters Search](https://github.com/user-attachments/assets/e09acbe2-8258-4463-8a4d-d307da228472)
 
-Click each restaurant to view more details such as ratings, reviews, contact info)
+Click each restaurant to view more details such as ratings, reviews, contact info, etc)
 ![View each restaurant's details](https://i.ibb.co/MMVRR8v/image.png)
 
-## Main App (Search route with filters applied. And Chatbot conversation example.)
+## Main App (Search route with filters applied, as well as a Chatbot conversation example)
 ![Filtered Search Results](https://i.ibb.co/fkKVwqF/image.png)
 
 # Features Requiring an Account to Access (Signup is free)
@@ -103,7 +105,7 @@ View all your saved routes and restaurants found on each route.
 ![Restaurants on your saved route](https://i.ibb.co/n35qgvK/image.png)
 
 ## Saved Chats Page
-View all your chatbot history.
+View all your saved chatbot history conversations.
 ![Saved Chats](https://i.ibb.co/88zdk67/image.png)
 ![Chats based on your saved route and results](https://i.ibb.co/pJRxJsp/image.png)
 
