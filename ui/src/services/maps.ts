@@ -417,10 +417,12 @@ class MapService {
         );
       }
 
-      // When selecting final restaurants, ensure even distribution
+      // Replace the final distribution section with:
+
+      // When selecting final restaurants, ensure even distribution based on requested stops
       if (allRestaurants.length > 30) {
-        // Divide route into 6 sections for final distribution
-        const finalSections = 6;
+        // Use maxStops if specified, otherwise default to 6 sections
+        const finalSections = options.maxStops || 6;
         const sectionLength = totalDistance / finalSections;
         const selectedRestaurants: Restaurant[] = [];
         
@@ -428,27 +430,38 @@ class MapService {
           const sectionStart = i * sectionLength;
           const sectionEnd = (i + 1) * sectionLength;
           
-          // Get restaurants in this section
+          // Get restaurants in this section THAT STILL MEET CRITERIA
           const sectionRestaurants = allRestaurants.filter(r => 
-            r.distanceFromStart >= sectionStart && r.distanceFromStart < sectionEnd
+            r.distanceFromStart >= sectionStart && 
+            r.distanceFromStart < sectionEnd &&
+            r.rating >= options.minRating && 
+            (!options.considerDetour || r.detourMinutes <= options.maxDetourMinutes)
           );
           
-          // Sort by rating and take top 5 from each section
+          // Sort by rating and take only top restaurant from each section if maxStops is specified
           sectionRestaurants.sort((a, b) => {
             if (b.rating !== a.rating) return b.rating - a.rating;
             return b.userRatingCount - a.userRatingCount;
           });
           
-          selectedRestaurants.push(...sectionRestaurants.slice(0, 5));
+          // If maxStops is specified, only take the best restaurant per section
+          // Otherwise, take up to 5 restaurants per section
+          const restaurantsToTake = options.maxStops ? 1 : 5;
+          selectedRestaurants.push(...sectionRestaurants.slice(0, restaurantsToTake));
         }
         
-        allRestaurants = selectedRestaurants.slice(0, 30);
+        // If maxStops is specified, limit to that number, otherwise limit to 30
+        const limit = options.maxStops || 30;
+        allRestaurants = selectedRestaurants.slice(0, limit);
+
+        // Log distribution for debugging
         console.log('Final restaurant distribution:');
         for (let i = 0; i < finalSections; i++) {
           const sectionStart = i * sectionLength;
           const sectionEnd = (i + 1) * sectionLength;
           const count = allRestaurants.filter(r => 
-            r.distanceFromStart >= sectionStart && r.distanceFromStart < sectionEnd
+            r.distanceFromStart >= sectionStart && 
+            r.distanceFromStart < sectionEnd
           ).length;
           console.log(`Section ${i + 1}: ${count} restaurants (${(sectionStart/1000).toFixed(1)}km - ${(sectionEnd/1000).toFixed(1)}km)`);
         }
@@ -457,11 +470,18 @@ class MapService {
       // Final sort by distance
       allRestaurants.sort((a, b) => a.distanceFromStart - b.distanceFromStart);
 
+      // Update message to be more accurate
+      const message = `Found ${allRestaurants.length} restaurants${
+        options.minRating > 0 ? ` rated ${options.minRating}+ stars` : ''
+      }${
+        options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of` : ' along'
+      } your route${
+        options.maxStops ? `, limited to ${options.maxStops} stops` : ''
+      }.`;
+
       return {
         restaurants: allRestaurants,
-        message: `Found ${allRestaurants.length} highly-rated restaurants${
-          options.considerDetour ? ` within ${options.maxDetourMinutes} minutes of` : ' along'
-        } your route.`
+        message: message
       };
     } catch (error) {
       console.error('Error fetching restaurants:', error);
