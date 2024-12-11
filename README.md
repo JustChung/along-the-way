@@ -1,7 +1,7 @@
 # along-the-way
-A web app to find destinations (restaurants) along a route. Enter a starting point and a destination and it will find a route with recommended restaurants in between. Additional features: more route filtering options, user authentication, ai chatbot, saved routes, and saved chats.
+A web app to find destinations (restaurants) along a route. Enter a starting point and a destination and it will find a route with recommended restaurants in between. Additional features: more route filtering options (detour time, maximum number of stops, minimum star rating), user authentication, ai chatbot, saved routes, and saved chats.
 
-Possible Routes: City to City, State to State, Cross Country (multiple states road trip), overseas (routes within a foreign country). As long as the source and destination are valid.
+Possible Routes: City to City, State to State, Cross-Country (a road trip through multiple states), and overseas (routes within a foreign country), as long as the source and destination are valid.
 
 # Credits:
 Project Manager: Justin C.
@@ -11,6 +11,12 @@ Developer: Lokaranjan M.
 Developer: Carter P.
 
 Business Analyst/QA: Michael L. 
+
+## Tech Stack
+- React.js
+- Node.js
+- Material Tailwind
+- Google Firebase
 
 ## Getting Started
 
@@ -61,7 +67,44 @@ Select the following APIs and enable them for your project.
     VITE_YELP_API_KEY=YOUR_YELP_API_KEY 
     ```
 4. Ensure that your Firebase project is set up correctly for a web app. Enable user authentication and cloud firestore.
-5. Run the development server
+5. Run the development server. App will run on local host ie: http://localhost:5173/
     ```bash
     npm run dev
     ```
+
+# Demo Screenshots
+## Main App (Before using it)
+![Main App](https://i.ibb.co/2nsmnNH/image.png)
+
+# User Authentication
+Login Page, Signup Page, Successful Login animation)
+![Login Page](https://github.com/user-attachments/assets/4b7b32b2-4c7c-4bf1-a935-4e691a6967ea)
+![Signup Page](https://github.com/user-attachments/assets/876d37d7-b9eb-488e-bb6e-b742c5fd0485)
+![Successful Login](https://github.com/user-attachments/assets/6cf35726-7478-4f62-92ce-64f10c1a4fb3)
+
+## Main App (Search route with no filters on. And Chatbot conversation example.)
+![No Filters Search](https://github.com/user-attachments/assets/e09acbe2-8258-4463-8a4d-d307da228472)
+
+Click each restaurant to view more details such as ratings, reviews, contact info)
+![View each restaurant's details](https://i.ibb.co/MMVRR8v/image.png)
+
+## Main App (Search route with filters applied. And Chatbot conversation example.)
+![Filtered Search Results](https://i.ibb.co/fkKVwqF/image.png)
+
+# Features Requiring an Account to Access (Signup is free)
+
+## Account Details Page
+(Features: Change password, resend verification email, and delete account)
+![Accounts Page](https://github.com/user-attachments/assets/5ca40945-5b82-4596-bb34-a16e99c59ebe)
+
+## Saved Routes Page
+View all your saved routes and restaurants found on each route.
+![Saved Routes](https://i.ibb.co/3rCqHBr/image.png)
+![Restaurants on your saved route](https://i.ibb.co/n35qgvK/image.png)
+
+## Saved Chats Page
+View all your chatbot history.
+![Saved Chats](https://i.ibb.co/88zdk67/image.png)
+![Chats based on your saved route and results](https://i.ibb.co/pJRxJsp/image.png)
+
+
