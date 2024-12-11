@@ -1,78 +1,139 @@
-# along-the-way
+# Along The Way
+
 A web app to find destinations (restaurants) along a route. Enter a starting point and a destination and it will find a route with recommended restaurants in between. Additional features: more route filtering options (detour time, maximum number of stops, minimum star rating), user authentication, ai chatbot, saved routes, and saved chats.
 
+## Route Types
 Possible Routes: City to City, State to State, Cross-Country (a road trip through multiple states), and overseas (routes within a foreign country), as long as the source and destination are valid.
 
-# Credits:
-Project Manager: Justin C.
+## Credits
+- **Project Manager:** Justin C.
+- **Developer:** Lokaranjan M.
+- **Developer:** Carter P.
+- **Business Analyst/QA:** Michael L.
 
-Developer: Lokaranjan M.
+## Detailed Features
 
-Developer: Carter P.
+### Core Features
+- **Interactive Route Planning**:
+  - Real-time route visualization on Google Maps
+  - Restaurant markers color-coded by detour time
+  - Detailed restaurant information windows
+  
+- **Smart Filtering**:
+  - Maximum detour time in minutes
+  - Minimum star rating (1-5 stars)
+  - Number of stops
+  - Toggle detour consideration
 
-Business Analyst/QA: Michael L. 
+- **Restaurant Details**:
+  - Ratings and reviews from multiple sources
+  - Business hours and contact information
+  - Facilities information (outdoor seating, wheelchair access, etc.)
+  - Photos (when available)
+  - Price level indicators
+  - Distance and detour time calculations
+
+- **AI Chatbot Assistant**:
+  - Natural language route planning
+  - Restaurant recommendations
+  - Saved chat history
+  - Context-aware responses
 
 ## Tech Stack
-- React.js
-- Node.js
-- Material Tailwind
-- Google Firebase
+* React.js
+* Node.js
+* Material Tailwind
+* Google Firebase
 
 ## Getting Started
 
 ### Prerequisites (Required)
-
-- [Node.js](https://nodejs.org/en/)
-- GOOGLE_GEMINI_API_KEY
-- GOOGLE_MAPS_API_KEY
-- Google Firebase secrets
+* Node.js
+* GOOGLE_GEMINI_API_KEY
+* GOOGLE_MAPS_API_KEY
+* Google Firebase secrets
 
 Note: Some API keys may expire after the free trial or have limits.
 
-In Google Cloud Console: Create a new project:
-Select all of the following APIs and enable them for your project.
-- Directions API
-- Places API (NEW)
-- Places API
-- Maps Embedded API
-- Maps JavaScript API
-- Geocoding API
-- Gemini API
+In Google Cloud Console: Create a new project: Select all of the following APIs and enable them for your project.
+* Directions API
+* Places API (NEW)
+* Places API
+* Maps Embedded API
+* Maps JavaScript API
+* Geocoding API
+* Gemini API
 
 ### Prerequisites (Optional)
-- Yelp API key
-- Trip Advisor API key
+* Yelp API key
+* Trip Advisor API key
 
 ### Installation
 
 1. Clone the repo
-    ```bash
-    git clone https://github.com/JustChung/along-the-way.git
-    cd into the UI folder
-    ```
+```bash
+git clone https://github.com/JustChung/along-the-way.git
+cd into the UI folder
+```
+
 2. Install NPM packages
-    ```bash
-    npm install
-    ```
+```bash
+npm install
+```
+
 3. Create a `.env.local` file in the root directory and add the following:
-    ```env
-    VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-    VITE_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
-    VITE_REACT_APP_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
-    VITE_REACT_APP_FIREBASE_AUTH_DOMAIN=YOUR_FIREBASE_AUTH_DOMAIN
-    VITE_REACT_APP_FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
-    VITE_REACT_APP_FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET
-    VITE_REACT_APP_FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID
-    VITE_REACT_APP_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
-    VITE_REACT_APP_FIREBASE_MEASUREMENT_ID=YOUR_FIREBASE_MEASUREMENT_ID
-    VITE_TRIPADVISOR_API_KEY=YOUR_TRIPADVISOR_API_KEY
-    VITE_YELP_API_KEY=YOUR_YELP_API_KEY 
-    ```
+```env
+VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+VITE_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+VITE_REACT_APP_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
+VITE_REACT_APP_FIREBASE_AUTH_DOMAIN=YOUR_FIREBASE_AUTH_DOMAIN
+VITE_REACT_APP_FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
+VITE_REACT_APP_FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET
+VITE_REACT_APP_FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID
+VITE_REACT_APP_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
+VITE_REACT_APP_FIREBASE_MEASUREMENT_ID=YOUR_FIREBASE_MEASUREMENT_ID
+VITE_TRIPADVISOR_API_KEY=YOUR_TRIPADVISOR_API_KEY
+VITE_YELP_API_KEY=YOUR_YELP_API_KEY 
+```
+
 4. Ensure that your Firebase project is set up correctly for a web app. Enable user authentication and cloud firestore.
 5. Run the development server. The app will run on a local host in your web browser ie: http://localhost:5173/
-    ```bash
-    npm run dev
-    ```
+```bash
+npm run dev
+```
+
+## Implementation Details
+
+### Restaurant Search
+- Segments route into optimal sections based on total distance
+- Fetches restaurants along each segment using Places API
+- Calculates detour times using Distance Matrix API
+- Filters results based on user preferences
+- Distributes stops evenly along the route when maximum stops is specified
+
+### Data Storage
+- Routes are automatically saved for logged-in users
+- Chat histories are preserved and linked to routes
+- User preferences and settings are stored in Firestore
+
+### Review System
+- Primary reviews from Google Places API
+- Optional integration with Yelp and TripAdvisor
+- Review aggregation and sorting by date
+- Rating and review count display
+
+## Important Notes
+- The application requires a valid Google Maps API key with billing enabled
+- Restaurant data is fetched from the Google Places API and has usage quotas
+- The chatbot uses the Google Gemini API which has rate limits
+- Review aggregation from Yelp and TripAdvisor is optional and requires additional API keys
+- Firebase has its own quotas and limits on the free tier
+
+## Security Features
+- Secure API key storage using environment variables
+- Firebase Authentication for user management
+- Firestore security rules for data access
+- Input validation and sanitization
 
 # Demo Screenshots
 ## Main App (Before using it)
